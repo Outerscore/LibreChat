@@ -162,8 +162,12 @@ const ChatForm = memo(function ChatForm({
     if (!isInIframe) {
       return false;
     }
-    const osPage = new URLSearchParams(window.location.search).get('os_page');
-    return osPage === 'canvas2';
+    const fromSession = sessionStorage.getItem('outerscore:page');
+    if (fromSession) {
+      return fromSession === 'canvas2';
+    }
+    const fromUrl = new URLSearchParams(window.location.search).get('os_page');
+    return fromUrl === 'canvas2';
   }, []);
 
   const handleCanvasSend = useCallback(() => {

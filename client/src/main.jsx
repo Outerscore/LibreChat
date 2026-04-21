@@ -8,6 +8,15 @@ import { ApiErrorBoundaryProvider } from './hooks/ApiErrorBoundaryContext';
 import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/copy-tex.js';
 
+try {
+  const osPage = new URLSearchParams(window.location.search).get('os_page');
+  if (osPage) {
+    sessionStorage.setItem('outerscore:page', osPage);
+  }
+} catch {
+  /* sessionStorage unavailable — safe to ignore */
+}
+
 const container = document.getElementById('root');
 const root = createRoot(container);
 
