@@ -15,6 +15,7 @@ export default function useSubmitMessage() {
 
   const autoSendPrompts = useRecoilValue(store.autoSendPrompts);
   const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
+  const setCanvasMode = useSetRecoilState(store.canvasModeFamily(index));
 
   const submitMessage = useCallback(
     (data?: { text: string }) => {
@@ -42,6 +43,17 @@ export default function useSubmitMessage() {
     [ask, methods, addedConvo, setMessages, getMessages, latestMessage],
   );
 
+  const submitCanvasMessage = useCallback(
+    (data?: { text: string }) => {
+      if (!data) {
+        return;
+      }
+      setCanvasMode(true);
+      submitMessage(data);
+    },
+    [submitMessage, setCanvasMode],
+  );
+
   const submitPrompt = useCallback(
     (text: string) => {
       const parsedText = replaceSpecialVars({ text, user });
@@ -58,5 +70,5 @@ export default function useSubmitMessage() {
     [autoSendPrompts, submitMessage, setActivePrompt, methods, user],
   );
 
-  return { submitMessage, submitPrompt };
+  return { submitMessage, submitCanvasMessage, submitPrompt };
 }

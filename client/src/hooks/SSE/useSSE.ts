@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useSetRecoilState } from 'recoil';
-import { request, createPayload, removeNullishValues } from 'librechat-data-provider';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSetRecoilState, useRecoilValue, useResetRecoilState } from 'recoil';
+import { request, createPayload, removeNullishValues, QueryKeys } from 'librechat-data-provider';
 import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
@@ -13,8 +14,12 @@ import { clearAllDrafts } from '~/utils';
 import store from '~/store';
 
 type CanvasStreamMessage =
+  | { type: 'outerscore:stream-start' }
   | { type: 'outerscore:stream-chunk'; chunk: string; accumulated: string }
-  | { type: 'outerscore:stream-end'; accumulated: string };
+  | { type: 'outerscore:stream-end'; accumulated: string }
+  | { type: 'outerscore:canvas-complete' };
+
+const CANVAS_PLACEHOLDER_TEXT = '✍️ Content written to canvas.';
 
 type ChatHelpers = Pick<
   EventHandlerParams,
@@ -38,6 +43,9 @@ export default function useSSE(
   const [completed, setCompleted] = useState(new Set());
   const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
   const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(runIndex));
+  const canvasMode = useRecoilValue(store.canvasModeFamily(runIndex));
+  const resetCanvasMode = useResetRecoilState(store.canvasModeFamily(runIndex));
+  const queryClient = useQueryClient();
 
   const {
     setMessages,
@@ -89,12 +97,48 @@ export default function useSSE(
 
     let textIndex = null;
     let accumulatedText = '';
+    let canvasStreamStarted = false;
     const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+    const shouldPostToCanvas = isInIframe && canvasMode;
     const postToCanvas = (message: CanvasStreamMessage) => {
-      if (!isInIframe) {
+      if (!shouldPostToCanvas) {
         return;
       }
       window.parent.postMessage(message, '*');
+    };
+    const replaceLastAssistantWithPlaceholder = () => {
+      const msgs = getMessages();
+      if (!msgs || msgs.length === 0) {
+        return;
+      }
+      const lastIdx = msgs.length - 1;
+      const last = msgs[lastIdx];
+      if (last.isCreatedByUser) {
+        return;
+      }
+      const replaced: TMessage = {
+        ...last,
+        text: CANVAS_PLACEHOLDER_TEXT,
+        content: undefined,
+      };
+      const nextMessages = [...msgs.slice(0, lastIdx), replaced];
+      setMessages(nextMessages);
+      const convoId = last.conversationId ?? submission.conversation?.conversationId;
+      if (convoId) {
+        queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], (prev) => {
+          if (!prev || prev.length === 0) {
+            return prev;
+          }
+          const prevLast = prev[prev.length - 1];
+          if (prevLast.isCreatedByUser) {
+            return prev;
+          }
+          return [
+            ...prev.slice(0, prev.length - 1),
+            { ...prevLast, text: CANVAS_PLACEHOLDER_TEXT, content: undefined },
+          ];
+        });
+      }
     };
     clearStepMaps();
 
@@ -125,7 +169,12 @@ export default function useSSE(
           setShowStopButton(false);
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
-        postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
+        if (shouldPostToCanvas) {
+          postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
+          replaceLastAssistantWithPlaceholder();
+          postToCanvas({ type: 'outerscore:canvas-complete' });
+          resetCanvasMode();
+        }
         console.log('final', data);
         return;
       } else if (data.created != null) {
@@ -155,7 +204,11 @@ export default function useSSE(
       } else {
         const text: string = data.text ?? data.response ?? '';
 
-        if (isInIframe && typeof text === 'string' && text.length > accumulatedText.length) {
+        if (shouldPostToCanvas && typeof text === 'string' && text.length > accumulatedText.length) {
+          if (!canvasStreamStarted) {
+            canvasStreamStarted = true;
+            postToCanvas({ type: 'outerscore:stream-start' });
+          }
           const chunk = text.slice(accumulatedText.length);
           accumulatedText = text;
           postToCanvas({
@@ -183,6 +236,9 @@ export default function useSSE(
     });
 
     sse.addEventListener('cancel', async () => {
+      if (shouldPostToCanvas) {
+        resetCanvasMode();
+      }
       const streamKey = (submission as TSubmission | null)?.['initialResponse']?.messageId;
       if (completed.has(streamKey)) {
         setIsSubmitting(false);
@@ -237,6 +293,9 @@ export default function useSSE(
       }
 
       console.log('error in server stream.');
+      if (shouldPostToCanvas) {
+        resetCanvasMode();
+      }
       (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
 
       let data: TResData | undefined = undefined;
