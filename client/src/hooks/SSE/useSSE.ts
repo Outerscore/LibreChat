@@ -12,6 +12,10 @@ import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
 import store from '~/store';
 
+type CanvasStreamMessage =
+  | { type: 'outerscore:stream-chunk'; chunk: string; accumulated: string }
+  | { type: 'outerscore:stream-end'; accumulated: string };
+
 type ChatHelpers = Pick<
   EventHandlerParams,
   | 'setMessages'
@@ -84,6 +88,14 @@ export default function useSSE(
     payload = removeNullishValues(payload) as TPayload;
 
     let textIndex = null;
+    let accumulatedText = '';
+    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+    const postToCanvas = (message: CanvasStreamMessage) => {
+      if (!isInIframe) {
+        return;
+      }
+      window.parent.postMessage(message, '*');
+    };
     clearStepMaps();
 
     const sse = new SSE(payloadData.server, {
@@ -113,6 +125,7 @@ export default function useSSE(
           setShowStopButton(false);
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+        postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
         console.log('final', data);
         return;
       } else if (data.created != null) {
@@ -140,7 +153,17 @@ export default function useSSE(
 
         contentHandler({ data, submission: submission as EventSubmission });
       } else {
-        const text = data.text ?? data.response;
+        const text: string = data.text ?? data.response ?? '';
+
+        if (isInIframe && typeof text === 'string' && text.length > accumulatedText.length) {
+          const chunk = text.slice(accumulatedText.length);
+          accumulatedText = text;
+          postToCanvas({
+            type: 'outerscore:stream-chunk',
+            chunk,
+            accumulated: accumulatedText,
+          });
+        }
 
         const initialResponse = {
           ...(submission.initialResponse as TMessage),

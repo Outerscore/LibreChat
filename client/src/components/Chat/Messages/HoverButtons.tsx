@@ -1,7 +1,14 @@
 import React, { useState, useMemo, memo } from 'react';
 import { useRecoilState } from 'recoil';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
-import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
+import {
+  EditIcon,
+  SendIcon,
+  Clipboard,
+  CheckMark,
+  ContinueIcon,
+  RegenerateIcon,
+} from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
 import MessageAudio from './MessageAudio';
@@ -35,6 +42,21 @@ type HoverButtonProps = {
   isLast?: boolean;
   className?: string;
   buttonStyle?: string;
+};
+
+const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+
+const sendToCanvas = (content: string) => {
+  if (typeof window === 'undefined' || window.parent === window) {
+    return;
+  }
+  window.parent.postMessage(
+    {
+      type: 'outerscore:content',
+      html: content,
+    },
+    '*',
+  );
 };
 
 const extractMessageContent = (message: TMessage): string => {
@@ -218,6 +240,16 @@ const HoverButtons = ({
           isSubmitting && isCreatedByUser ? 'md:opacity-0 md:group-hover:opacity-100' : '',
         )}
       />
+
+      {/* Send to Canvas Button */}
+      {!isCreatedByUser && isInIframe && (
+        <HoverButton
+          onClick={() => sendToCanvas(extractMessageContent(message))}
+          title={localize('com_ui_send_to_canvas')}
+          icon={<SendIcon size={19} className="text-text-secondary-alt" />}
+          isLast={isLast}
+        />
+      )}
 
       {/* Edit Button */}
       {isEditableEndpoint && (
