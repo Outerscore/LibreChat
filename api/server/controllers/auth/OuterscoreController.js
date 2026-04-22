@@ -27,7 +27,13 @@ const outerscoreBridgeController = async (req, res) => {
   try {
     payload = await verifyOuterscoreToken(token, tokenKeyUrl);
   } catch (err) {
-    logger.warn('[outerscore] token verification failed:', err.message);
+    logger.warn('[outerscore] token verification failed:', {
+      name: err?.name,
+      message: err?.message || '(empty)',
+      code: err?.code,
+      cause: err?.cause?.message || err?.cause,
+      stack: err?.stack?.split('\n').slice(0, 4).join('\n'),
+    });
     return res.status(401).json({ message: 'Invalid Outerscore token' });
   }
 
