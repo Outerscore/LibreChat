@@ -29,6 +29,13 @@ try {
           /* ignore */
         }
       }
+      if (data.type === 'outerscore:canvas-context' && typeof data.content === 'string') {
+        try {
+          sessionStorage.setItem('outerscore:canvas-content', data.content);
+        } catch {
+          /* ignore */
+        }
+      }
     });
   }
 } catch {

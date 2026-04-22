@@ -230,11 +230,6 @@ const showStopButtonByIndex = atomFamily<boolean, string | number>({
   default: false,
 });
 
-const canvasModeFamily = atomFamily<boolean, string | number>({
-  key: 'canvasModeByIndex',
-  default: false,
-});
-
 const abortScrollFamily = atomFamily<boolean, string | number>({
   key: 'abortScrollByIndex',
   default: false,
@@ -472,7 +467,6 @@ export default {
   submissionByIndex,
   textByIndex,
   showStopButtonByIndex,
-  canvasModeFamily,
   abortScrollFamily,
   isSubmittingFamily,
   optionSettingsFamily,

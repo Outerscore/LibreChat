@@ -6,6 +6,42 @@ import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId } from '~/common';
 import store from '~/store';
 
+const CANVAS_CONTEXT_KEY = 'outerscore:canvas-content';
+const CANVAS_PAGE_KEY = 'outerscore:page';
+
+const buildCanvasPrompt = (userText: string): string => {
+  let canvas = '';
+  let isCanvas2 = false;
+  try {
+    isCanvas2 = sessionStorage.getItem(CANVAS_PAGE_KEY) === 'canvas2';
+    canvas = sessionStorage.getItem(CANVAS_CONTEXT_KEY) ?? '';
+  } catch {
+    return userText;
+  }
+  if (!isCanvas2) {
+    return userText;
+  }
+  const trimmed = canvas.trim();
+  if (!trimmed) {
+    return [
+      'You are editing a document on a canvas. The document is currently empty.',
+      'Respond with the complete document content in Markdown only — no preamble, no commentary, no code fences.',
+      '',
+      `Instruction: ${userText}`,
+    ].join('\n');
+  }
+  return [
+    'You are editing a document on a canvas. The current document content is:',
+    '---',
+    trimmed,
+    '---',
+    '',
+    'Apply the instruction below and respond with the complete updated document in Markdown only — no preamble, no commentary, no code fences.',
+    '',
+    `Instruction: ${userText}`,
+  ].join('\n');
+};
+
 export default function useSubmitMessage() {
   const { user } = useAuthContext();
   const methods = useChatFormContext();
@@ -15,7 +51,6 @@ export default function useSubmitMessage() {
 
   const autoSendPrompts = useRecoilValue(store.autoSendPrompts);
   const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
-  const setCanvasMode = useSetRecoilState(store.canvasModeFamily(index));
 
   const submitMessage = useCallback(
     (data?: { text: string }) => {
@@ -30,9 +65,11 @@ export default function useSubmitMessage() {
         setMessages([...(rootMessages || []), latestMessage]);
       }
 
+      const augmentedText = buildCanvasPrompt(data.text);
+
       ask(
         {
-          text: data.text,
+          text: augmentedText,
         },
         {
           addedConvo: addedConvo ?? undefined,
@@ -41,17 +78,6 @@ export default function useSubmitMessage() {
       methods.reset();
     },
     [ask, methods, addedConvo, setMessages, getMessages, latestMessage],
-  );
-
-  const submitCanvasMessage = useCallback(
-    (data?: { text: string }) => {
-      if (!data) {
-        return;
-      }
-      setCanvasMode(true);
-      submitMessage(data);
-    },
-    [submitMessage, setCanvasMode],
   );
 
   const submitPrompt = useCallback(
@@ -70,5 +96,5 @@ export default function useSubmitMessage() {
     [autoSendPrompts, submitMessage, setActivePrompt, methods, user],
   );
 
-  return { submitMessage, submitCanvasMessage, submitPrompt };
+  return { submitMessage, submitPrompt };
 }

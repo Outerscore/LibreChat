@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSetRecoilState, useRecoilValue, useResetRecoilState } from 'recoil';
+import { useSetRecoilState } from 'recoil';
 import { request, createPayload, removeNullishValues, QueryKeys } from 'librechat-data-provider';
 import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
@@ -43,8 +43,6 @@ export default function useSSE(
   const [completed, setCompleted] = useState(new Set());
   const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
   const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(runIndex));
-  const canvasMode = useRecoilValue(store.canvasModeFamily(runIndex));
-  const resetCanvasMode = useResetRecoilState(store.canvasModeFamily(runIndex));
   const queryClient = useQueryClient();
 
   const {
@@ -99,7 +97,13 @@ export default function useSSE(
     let accumulatedText = '';
     let canvasStreamStarted = false;
     const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    const shouldPostToCanvas = isInIframe && canvasMode;
+    let isCanvas2 = false;
+    try {
+      isCanvas2 = sessionStorage.getItem('outerscore:page') === 'canvas2';
+    } catch {
+      /* ignore */
+    }
+    const shouldPostToCanvas = isInIframe && isCanvas2;
     const postToCanvas = (message: CanvasStreamMessage) => {
       if (!shouldPostToCanvas) {
         return;
@@ -173,7 +177,6 @@ export default function useSSE(
           postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
           replaceLastAssistantWithPlaceholder();
           postToCanvas({ type: 'outerscore:canvas-complete' });
-          resetCanvasMode();
         }
         console.log('final', data);
         return;
@@ -236,9 +239,6 @@ export default function useSSE(
     });
 
     sse.addEventListener('cancel', async () => {
-      if (shouldPostToCanvas) {
-        resetCanvasMode();
-      }
       const streamKey = (submission as TSubmission | null)?.['initialResponse']?.messageId;
       if (completed.has(streamKey)) {
         setIsSubmitting(false);
@@ -293,9 +293,6 @@ export default function useSSE(
       }
 
       console.log('error in server stream.');
-      if (shouldPostToCanvas) {
-        resetCanvasMode();
-      }
       (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
 
       let data: TResData | undefined = undefined;

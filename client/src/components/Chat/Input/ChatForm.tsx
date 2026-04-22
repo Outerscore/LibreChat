@@ -32,7 +32,6 @@ import CollapseChat from './CollapseChat';
 import StreamAudio from './StreamAudio';
 import StopButton from './StopButton';
 import SendButton from './SendButton';
-import SendCanvasButton from './SendCanvasButton';
 import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
 import Mention from './Mention';
@@ -152,27 +151,7 @@ const ChatForm = memo(function ChatForm({
     isSubmitting,
   });
 
-  const { submitMessage, submitCanvasMessage, submitPrompt } = useSubmitMessage();
-
-  const showCanvasButton = useMemo(() => {
-    if (typeof window === 'undefined') {
-      return false;
-    }
-    const isInIframe = window.parent !== window;
-    if (!isInIframe) {
-      return false;
-    }
-    const fromSession = sessionStorage.getItem('outerscore:page');
-    if (fromSession) {
-      return fromSession === 'canvas2';
-    }
-    const fromUrl = new URLSearchParams(window.location.search).get('os_page');
-    return fromUrl === 'canvas2';
-  }, []);
-
-  const handleCanvasSend = useCallback(() => {
-    methods.handleSubmit(submitCanvasMessage)();
-  }, [methods, submitCanvasMessage]);
+  const { submitMessage, submitPrompt } = useSubmitMessage();
 
   const handleKeyUp = useHandleKeyUp({
     index,
@@ -386,15 +365,6 @@ const ChatForm = memo(function ChatForm({
                   disabled={disableInputs || isNotAppendable}
                   isSubmitting={isSubmitting}
                 />
-              )}
-              {showCanvasButton && !isSubmitting && endpoint && (
-                <div className={`${isRTL ? 'ml-1' : 'mr-1'}`}>
-                  <SendCanvasButton
-                    control={methods.control}
-                    disabled={filesLoading || isSubmitting || disableInputs || isNotAppendable}
-                    onCanvasSend={handleCanvasSend}
-                  />
-                </div>
               )}
               <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
                 {isSubmitting && showStopButton ? (
