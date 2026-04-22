@@ -86,6 +86,9 @@ const userSchema = new Schema<IUser>(
     discordId: {
       type: String,
     },
+    outerscoreId: {
+      type: String,
+    },
     appleId: {
       type: String,
     },
@@ -170,6 +173,7 @@ const oAuthIdFields = [
   'githubId',
   'discordId',
   'appleId',
+  'outerscoreId',
 ] as const;
 
 for (const field of oAuthIdFields) {

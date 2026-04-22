@@ -28,6 +28,7 @@ import {
 } from '~/data-provider';
 import { TAuthConfig, TUserContext, TAuthContext, TResError } from '~/common';
 import { SESSION_KEY, isSafeRedirect, getPostLoginRedirect } from '~/utils';
+import useOuterscoreAutoLogin from './useOuterscoreAutoLogin';
 import useTimeout from './useTimeout';
 import store from '~/store';
 
@@ -155,6 +156,19 @@ const AuthContextProvider = ({
   });
   const refreshToken = useRefreshTokenMutation();
 
+  const { enabled: outerscoreEnabled, pending: outerscorePending } = useOuterscoreAutoLogin({
+    isAuthenticated,
+    onSuccess: (data) => {
+      setError(undefined);
+      setUserContext({
+        token: data.token,
+        isAuthenticated: true,
+        user: data.user,
+        redirect: '/c/new',
+      });
+    },
+  });
+
   const logout = useCallback(
     (redirect?: string) => {
       if (redirect) {
@@ -235,6 +249,9 @@ const AuthContextProvider = ({
       doSetError(undefined);
     }
     if (token == null || !token || !isAuthenticated) {
+      if (outerscoreEnabled && outerscorePending) {
+        return;
+      }
       silentRefresh();
     }
   }, [
@@ -248,6 +265,8 @@ const AuthContextProvider = ({
     navigate,
     silentRefresh,
     setUserContext,
+    outerscoreEnabled,
+    outerscorePending,
   ]);
 
   useEffect(() => {

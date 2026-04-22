@@ -20,6 +20,7 @@ export interface IUser extends Document {
   githubId?: string;
   discordId?: string;
   appleId?: string;
+  outerscoreId?: string;
   plugins?: string[];
   twoFactorEnabled?: boolean;
   totpSecret?: string;
@@ -109,6 +110,7 @@ export interface UserFilterOptions extends CursorPaginationParams {
   githubId?: string;
   discordId?: string;
   appleId?: string;
+  outerscoreId?: string;
   // Date filters
   createdAfter?: string;
   createdBefore?: string;

@@ -9,9 +9,27 @@ import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/copy-tex.js';
 
 try {
-  const osPage = new URLSearchParams(window.location.search).get('os_page');
+  const params = new URLSearchParams(window.location.search);
+  const osPage = params.get('os_page');
+  const osToken = params.get('os_token');
   if (osPage) {
     sessionStorage.setItem('outerscore:page', osPage);
+  }
+  if (osToken) {
+    sessionStorage.setItem('outerscore:token', osToken);
+  }
+  if (window.parent !== window) {
+    window.addEventListener('message', (event) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'outerscore:handshake' && typeof data.token === 'string') {
+        try {
+          sessionStorage.setItem('outerscore:token', data.token);
+        } catch {
+          /* ignore */
+        }
+      }
+    });
   }
 } catch {
   /* sessionStorage unavailable — safe to ignore */
