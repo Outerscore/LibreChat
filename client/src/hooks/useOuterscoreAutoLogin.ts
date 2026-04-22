@@ -49,7 +49,12 @@ export default function useOuterscoreAutoLogin({
 }: UseOuterscoreAutoLoginArgs): UseOuterscoreAutoLoginResult {
   const enabled = isOuterscoreContext();
   const attemptedRef = useRef(false);
+  const onSuccessRef = useRef(onSuccess);
   const [pending, setPending] = useState<boolean>(enabled);
+
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   useEffect(() => {
     if (!enabled) {
@@ -75,9 +80,8 @@ export default function useOuterscoreAutoLogin({
     dataService
       .outerscoreBridge(token)
       .then((data) => {
-        setPending(false);
         postToParent({ type: 'outerscore:auth-success' });
-        onSuccess(data);
+        onSuccessRef.current(data);
       })
       .catch((err: unknown) => {
         setPending(false);
@@ -89,7 +93,7 @@ export default function useOuterscoreAutoLogin({
         postToParent({ type: 'outerscore:auth-required' });
         console.warn('[outerscore] auto-login failed:', err);
       });
-  }, [enabled, isAuthenticated, onSuccess]);
+  }, [enabled, isAuthenticated]);
 
   return { enabled, pending };
 }
