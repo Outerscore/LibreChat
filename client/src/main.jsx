@@ -11,23 +11,28 @@ import 'katex/dist/contrib/copy-tex.js';
 try {
   const params = new URLSearchParams(window.location.search);
   const osPage = params.get('os_page');
-  const osToken = params.get('os_token');
   if (osPage) {
     sessionStorage.setItem('outerscore:page', osPage);
   }
-  if (osToken) {
-    sessionStorage.setItem('outerscore:token', osToken);
-  }
+
   if (window.parent !== window) {
+    const parentOrigin = import.meta.env.VITE_OUTERSCORE_PARENT_ORIGIN || '';
+
     window.addEventListener('message', (event) => {
+      if (parentOrigin && event.origin !== parentOrigin) {
+        return;
+      }
       const data = event.data;
-      if (!data || typeof data !== 'object') return;
+      if (!data || typeof data !== 'object') {
+        return;
+      }
       if (data.type === 'outerscore:handshake' && typeof data.token === 'string') {
         try {
           sessionStorage.setItem('outerscore:token', data.token);
         } catch {
           /* ignore */
         }
+        window.dispatchEvent(new CustomEvent('outerscore:token-ready'));
       }
       if (data.type === 'outerscore:canvas-context' && typeof data.content === 'string') {
         try {
@@ -37,6 +42,12 @@ try {
         }
       }
     });
+
+    try {
+      window.parent.postMessage({ type: 'outerscore:ready' }, '*');
+    } catch {
+      /* ignore */
+    }
   }
 } catch {
   /* sessionStorage unavailable — safe to ignore */

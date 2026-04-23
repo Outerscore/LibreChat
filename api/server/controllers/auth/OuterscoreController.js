@@ -25,7 +25,11 @@ const outerscoreBridgeController = async (req, res) => {
 
   let payload;
   try {
-    payload = await verifyOuterscoreToken(token, tokenKeyUrl);
+    payload = await verifyOuterscoreToken(token, {
+      tokenKeyUrl,
+      issuer: process.env.OUTERSCORE_JWT_ISSUER || undefined,
+      audience: process.env.OUTERSCORE_JWT_AUDIENCE || undefined,
+    });
   } catch (err) {
     logger.warn('[outerscore] token verification failed:', {
       name: err?.name,

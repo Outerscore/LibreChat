@@ -14,9 +14,17 @@ export interface OuterscoreTokenPayload {
   client_id?: string;
   exp: number;
   iat?: number;
+  iss?: string;
+  aud?: string | string[];
   scope?: string[];
   user: OuterscoreUserClaim;
   [claim: string]: unknown;
+}
+
+export interface OuterscoreVerifyOptions {
+  tokenKeyUrl: string;
+  issuer?: string;
+  audience?: string;
 }
 
 interface CachedKey {
@@ -62,18 +70,29 @@ export function resetOuterscorePublicKeyCache(): void {
 
 export async function verifyOuterscoreToken(
   token: string,
-  tokenKeyUrl: string,
+  options: OuterscoreVerifyOptions | string,
 ): Promise<OuterscoreTokenPayload> {
-  let pem = await getOuterscorePublicKey(tokenKeyUrl);
+  const opts: OuterscoreVerifyOptions =
+    typeof options === 'string' ? { tokenKeyUrl: options } : options;
+
+  const verifyOptions: jwt.VerifyOptions = { algorithms: ['RS256'] };
+  if (opts.issuer) {
+    verifyOptions.issuer = opts.issuer;
+  }
+  if (opts.audience) {
+    verifyOptions.audience = opts.audience;
+  }
+
+  let pem = await getOuterscorePublicKey(opts.tokenKeyUrl);
 
   try {
-    return jwt.verify(token, pem, { algorithms: ['RS256'] }) as OuterscoreTokenPayload;
+    return jwt.verify(token, pem, verifyOptions) as OuterscoreTokenPayload;
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError && err.message.includes('invalid signature')) {
       logger.warn('[outerscore] invalid signature — refreshing token_key and retrying');
       resetOuterscorePublicKeyCache();
-      pem = await getOuterscorePublicKey(tokenKeyUrl);
-      return jwt.verify(token, pem, { algorithms: ['RS256'] }) as OuterscoreTokenPayload;
+      pem = await getOuterscorePublicKey(opts.tokenKeyUrl);
+      return jwt.verify(token, pem, verifyOptions) as OuterscoreTokenPayload;
     }
     throw err;
   }
