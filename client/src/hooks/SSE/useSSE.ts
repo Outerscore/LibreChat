@@ -21,6 +21,33 @@ type CanvasStreamMessage =
 
 const CANVAS_PLACEHOLDER_TEXT = '✍️ Content written to canvas.';
 
+const extractMessageText = (message: TMessage | undefined | null): string => {
+  if (!message) {
+    return '';
+  }
+  if (typeof message.text === 'string' && message.text.length > 0) {
+    return message.text;
+  }
+  const content = message.content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (!part) {
+          return '';
+        }
+        if (typeof part === 'string') {
+          return part;
+        }
+        if ('text' in part && typeof part.text === 'string') {
+          return part.text;
+        }
+        return '';
+      })
+      .join('');
+  }
+  return typeof message.text === 'string' ? message.text : '';
+};
+
 type ChatHelpers = Pick<
   EventHandlerParams,
   | 'setMessages'
@@ -160,6 +187,32 @@ export default function useSSE(
       }
     });
 
+    const forwardCanvasStream = () => {
+      if (!shouldPostToCanvas) {
+        return;
+      }
+      const msgs = getMessages() ?? [];
+      const last = msgs[msgs.length - 1];
+      if (!last || last.isCreatedByUser) {
+        return;
+      }
+      const currentText = extractMessageText(last);
+      if (!currentText || currentText.length <= accumulatedText.length) {
+        return;
+      }
+      if (!canvasStreamStarted) {
+        canvasStreamStarted = true;
+        postToCanvas({ type: 'outerscore:stream-start' });
+      }
+      const chunk = currentText.slice(accumulatedText.length);
+      accumulatedText = currentText;
+      postToCanvas({
+        type: 'outerscore:stream-chunk',
+        chunk,
+        accumulated: accumulatedText,
+      });
+    };
+
     sse.addEventListener('message', (e: MessageEvent) => {
       const data = JSON.parse(e.data);
 
@@ -173,6 +226,7 @@ export default function useSSE(
           setShowStopButton(false);
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+        forwardCanvasStream();
         if (shouldPostToCanvas) {
           postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
           replaceLastAssistantWithPlaceholder();
@@ -207,20 +261,6 @@ export default function useSSE(
       } else {
         const text: string = data.text ?? data.response ?? '';
 
-        if (shouldPostToCanvas && typeof text === 'string' && text.length > accumulatedText.length) {
-          if (!canvasStreamStarted) {
-            canvasStreamStarted = true;
-            postToCanvas({ type: 'outerscore:stream-start' });
-          }
-          const chunk = text.slice(accumulatedText.length);
-          accumulatedText = text;
-          postToCanvas({
-            type: 'outerscore:stream-chunk',
-            chunk,
-            accumulated: accumulatedText,
-          });
-        }
-
         const initialResponse = {
           ...(submission.initialResponse as TMessage),
           parentMessageId: data.parentMessageId,
@@ -231,6 +271,8 @@ export default function useSSE(
           messageHandler(text, { ...submission, userMessage, initialResponse });
         }
       }
+
+      forwardCanvasStream();
     });
 
     sse.addEventListener('open', () => {
