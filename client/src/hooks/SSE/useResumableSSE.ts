@@ -142,6 +142,82 @@ export default function useResumableSSE(
     (currentStreamId: string, currentSubmission: TSubmission, isResume = false) => {
       let { userMessage } = currentSubmission;
       let textIndex: number | null = null;
+      let canvasAccumulated = '';
+      let canvasStreamStarted = false;
+      const isInIframe = typeof window !== 'undefined' && window.parent !== window;
+      let isCanvas2 = false;
+      try {
+        isCanvas2 = sessionStorage.getItem('outerscore:page') === 'canvas2';
+      } catch {
+        /* ignore */
+      }
+      const shouldPostToCanvas = isInIframe && isCanvas2;
+      const postToCanvas = (message: Record<string, unknown>) => {
+        if (!shouldPostToCanvas) return;
+        window.parent.postMessage(message, '*');
+      };
+      const extractMessageText = (message: TMessage | undefined | null): string => {
+        if (!message) return '';
+        if (typeof message.text === 'string' && message.text.length > 0) {
+          return message.text;
+        }
+        const content = message.content;
+        if (Array.isArray(content)) {
+          return content
+            .map((part) => {
+              if (!part) return '';
+              if (typeof part === 'string') return part;
+              if ('text' in part && typeof part.text === 'string') return part.text;
+              return '';
+            })
+            .join('');
+        }
+        return typeof message.text === 'string' ? message.text : '';
+      };
+      const forwardCanvasStream = () => {
+        if (!shouldPostToCanvas) return;
+        const msgs = getMessages() ?? [];
+        const last = msgs[msgs.length - 1];
+        if (!last || last.isCreatedByUser) return;
+        const currentText = extractMessageText(last);
+        if (!currentText || currentText.length <= canvasAccumulated.length) return;
+        if (!canvasStreamStarted) {
+          canvasStreamStarted = true;
+          postToCanvas({ type: 'outerscore:stream-start' });
+        }
+        const chunk = currentText.slice(canvasAccumulated.length);
+        canvasAccumulated = currentText;
+        postToCanvas({
+          type: 'outerscore:stream-chunk',
+          chunk,
+          accumulated: canvasAccumulated,
+        });
+      };
+      const replaceLastAssistantWithCanvasPlaceholder = () => {
+        const msgs = getMessages() ?? [];
+        if (!msgs.length) return;
+        const lastIdx = msgs.length - 1;
+        const last = msgs[lastIdx];
+        if (last.isCreatedByUser) return;
+        const replaced: TMessage = {
+          ...last,
+          text: '✍️ Content written to canvas.',
+          content: undefined,
+        };
+        setMessages([...msgs.slice(0, lastIdx), replaced]);
+        const convoId = last.conversationId ?? currentSubmission.conversation?.conversationId;
+        if (convoId) {
+          queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], (prev) => {
+            if (!prev || prev.length === 0) return prev;
+            const prevLast = prev[prev.length - 1];
+            if (prevLast.isCreatedByUser) return prev;
+            return [
+              ...prev.slice(0, prev.length - 1),
+              { ...prevLast, text: '✍️ Content written to canvas.', content: undefined },
+            ];
+          });
+        }
+      };
 
       const baseUrl = `${apiBaseUrl()}/api/agents/chat/stream/${encodeURIComponent(currentStreamId)}`;
       const url = isResume ? `${baseUrl}?resume=true` : baseUrl;
@@ -185,6 +261,12 @@ export default function useResumableSSE(
             // Optimistically remove from active jobs
             removeActiveJob(currentStreamId);
             (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+            forwardCanvasStream();
+            if (shouldPostToCanvas) {
+              postToCanvas({ type: 'outerscore:stream-end', accumulated: canvasAccumulated });
+              replaceLastAssistantWithCanvasPlaceholder();
+              postToCanvas({ type: 'outerscore:canvas-complete' });
+            }
             sse.close();
             setStreamId(null);
             return;
@@ -318,6 +400,7 @@ export default function useResumableSSE(
               textIndex = index;
             }
             contentHandler({ data, submission: currentSubmission as EventSubmission });
+            forwardCanvasStream();
             return;
           }
 
@@ -329,6 +412,7 @@ export default function useResumableSSE(
               messageId: data.messageId,
             };
             messageHandler(text, { ...currentSubmission, userMessage, initialResponse });
+            forwardCanvasStream();
           }
         } catch (error) {
           console.error('[ResumableSSE] Error processing message:', error);

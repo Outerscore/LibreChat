@@ -131,12 +131,6 @@ export default function useSSE(
       /* ignore */
     }
     const shouldPostToCanvas = isInIframe && isCanvas2;
-    console.debug('[outerscore] useSSE submission start', {
-      isInIframe,
-      isCanvas2,
-      shouldPostToCanvas,
-      runIndex,
-    });
     const postToCanvas = (message: CanvasStreamMessage) => {
       if (!shouldPostToCanvas) {
         return;
@@ -200,20 +194,9 @@ export default function useSSE(
       const msgs = getMessages() ?? [];
       const last = msgs[msgs.length - 1];
       if (!last || last.isCreatedByUser) {
-        console.debug('[outerscore] forwardCanvasStream: no assistant message', {
-          hasLast: !!last,
-          isUser: last?.isCreatedByUser,
-        });
         return;
       }
       const currentText = extractMessageText(last);
-      console.debug('[outerscore] forwardCanvasStream: tick', {
-        currentLen: currentText.length,
-        accumulatedLen: accumulatedText.length,
-        preview: currentText.slice(0, 40),
-        lastKeys: Object.keys(last),
-        contentShape: Array.isArray(last.content) ? last.content.map((p) => p && typeof p === 'object' && 'type' in p ? p.type : typeof p) : typeof last.content,
-      });
       if (!currentText || currentText.length <= accumulatedText.length) {
         return;
       }
