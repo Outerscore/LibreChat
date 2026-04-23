@@ -26,6 +26,42 @@ const parseThinkingContent = (text: string) => {
   };
 };
 
+const isCanvas2Mode = (): boolean => {
+  try {
+    return sessionStorage.getItem('outerscore:page') === 'canvas2';
+  } catch {
+    return false;
+  }
+};
+
+const CanvasWritingIndicator = () => (
+  <Container>
+    <div className="flex items-center gap-2 py-2 text-text-secondary">
+      <svg
+        className="h-4 w-4 animate-spin"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+        />
+      </svg>
+      <span className="text-sm">✍️ Writing to canvas…</span>
+    </div>
+  </Container>
+);
+
 const LoadingFallback = () => (
   <div className="text-message mb-[0.625rem] flex min-h-[20px] flex-col items-start gap-3 overflow-visible">
     <div className="markdown prose dark:prose-invert light w-full break-words dark:text-gray-100">
@@ -167,6 +203,10 @@ const MessageContent = ({
 
   if (edit) {
     return <EditMessage text={text} isSubmitting={isSubmitting} {...props} />;
+  }
+
+  if (isSubmitting && !message.isCreatedByUser && isCanvas2Mode()) {
+    return <CanvasWritingIndicator />;
   }
 
   return (
