@@ -17,7 +17,7 @@ const readToken = (): string | null => {
 
 const isInIframe = (): boolean => typeof window !== 'undefined' && window.parent !== window;
 
-const isOuterscoreContext = (): boolean => {
+export const isOuterscoreContext = (): boolean => {
   if (!isInIframe()) return false;
   try {
     return !!sessionStorage.getItem(PAGE_STORAGE_KEY) || !!sessionStorage.getItem(TOKEN_STORAGE_KEY);
