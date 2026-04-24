@@ -41,6 +41,15 @@ try {
           /* ignore */
         }
       }
+      if (data.type === 'outerscore:logout') {
+        try {
+          sessionStorage.removeItem('outerscore:token');
+          sessionStorage.removeItem('outerscore:canvas-content');
+        } catch {
+          /* ignore */
+        }
+        window.dispatchEvent(new CustomEvent('outerscore:logout'));
+      }
     });
 
     try {

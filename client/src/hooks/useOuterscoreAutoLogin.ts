@@ -5,6 +5,7 @@ import type * as t from 'librechat-data-provider';
 const TOKEN_STORAGE_KEY = 'outerscore:token';
 const PAGE_STORAGE_KEY = 'outerscore:page';
 const TOKEN_READY_EVENT = 'outerscore:token-ready';
+const LOGOUT_EVENT = 'outerscore:logout';
 
 const readToken = (): string | null => {
   try {
@@ -34,9 +35,22 @@ const postToParent = (message: { type: string; [key: string]: unknown }) => {
   }
 };
 
+const decodeJwtSub = (token: string): string | null => {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json?.sub === 'string' ? json.sub : null;
+  } catch {
+    return null;
+  }
+};
+
 export interface UseOuterscoreAutoLoginArgs {
   isAuthenticated: boolean;
+  currentUserId?: string;
   onSuccess: (data: t.TLoginResponse) => void;
+  onUserSwitch?: () => void;
 }
 
 export interface UseOuterscoreAutoLoginResult {
@@ -46,11 +60,15 @@ export interface UseOuterscoreAutoLoginResult {
 
 export default function useOuterscoreAutoLogin({
   isAuthenticated,
+  currentUserId,
   onSuccess,
+  onUserSwitch,
 }: UseOuterscoreAutoLoginArgs): UseOuterscoreAutoLoginResult {
   const enabled = isOuterscoreContext();
-  const attemptedRef = useRef(false);
+  const lastBridgedTokenRef = useRef<string | null>(null);
   const onSuccessRef = useRef(onSuccess);
+  const onUserSwitchRef = useRef(onUserSwitch);
+  const currentUserIdRef = useRef<string | undefined>(currentUserId);
   const [pending, setPending] = useState<boolean>(enabled);
 
   useEffect(() => {
@@ -58,24 +76,37 @@ export default function useOuterscoreAutoLogin({
   }, [onSuccess]);
 
   useEffect(() => {
+    onUserSwitchRef.current = onUserSwitch;
+  }, [onUserSwitch]);
+
+  useEffect(() => {
+    currentUserIdRef.current = currentUserId;
+  }, [currentUserId]);
+
+  useEffect(() => {
     if (!enabled) {
       setPending(false);
       return;
     }
-    if (isAuthenticated) {
-      setPending(false);
-      return;
-    }
-    if (attemptedRef.current) {
-      return;
-    }
 
     const runBridge = (token: string) => {
-      attemptedRef.current = true;
+      if (lastBridgedTokenRef.current === token) {
+        setPending(false);
+        return;
+      }
+
+      const incomingSub = decodeJwtSub(token);
+      const knownUserId = currentUserIdRef.current;
+      if (knownUserId && incomingSub && knownUserId !== incomingSub) {
+        onUserSwitchRef.current?.();
+      }
+
+      lastBridgedTokenRef.current = token;
       setPending(true);
       dataService
         .outerscoreBridge(token)
         .then((data) => {
+          setPending(false);
           postToParent({ type: 'outerscore:auth-success' });
           onSuccessRef.current(data);
         })
@@ -91,28 +122,43 @@ export default function useOuterscoreAutoLogin({
         });
     };
 
-    const token = readToken();
-    if (token) {
-      runBridge(token);
-      return;
-    }
+    const tryBridgeWithCurrentToken = () => {
+      const token = readToken();
+      if (token && token !== lastBridgedTokenRef.current) {
+        runBridge(token);
+      }
+    };
 
     const handleTokenReady = () => {
-      if (attemptedRef.current) {
-        return;
-      }
-      const freshToken = readToken();
-      if (freshToken) {
-        runBridge(freshToken);
-      }
+      tryBridgeWithCurrentToken();
+    };
+
+    const handleLogout = () => {
+      lastBridgedTokenRef.current = null;
+      setPending(true);
     };
 
     window.addEventListener(TOKEN_READY_EVENT, handleTokenReady);
-    postToParent({ type: 'outerscore:auth-required' });
+    window.addEventListener(LOGOUT_EVENT, handleLogout);
+
+    const initialToken = readToken();
+    if (initialToken) {
+      runBridge(initialToken);
+    } else {
+      postToParent({ type: 'outerscore:auth-required' });
+    }
 
     return () => {
       window.removeEventListener(TOKEN_READY_EVENT, handleTokenReady);
+      window.removeEventListener(LOGOUT_EVENT, handleLogout);
     };
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (isAuthenticated) {
+      setPending(false);
+    }
   }, [enabled, isAuthenticated]);
 
   return { enabled, pending };

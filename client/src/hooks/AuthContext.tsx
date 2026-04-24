@@ -156,19 +156,6 @@ const AuthContextProvider = ({
   });
   const refreshToken = useRefreshTokenMutation();
 
-  const { enabled: outerscoreEnabled, pending: outerscorePending } = useOuterscoreAutoLogin({
-    isAuthenticated,
-    onSuccess: (data) => {
-      setError(undefined);
-      setUserContext({
-        token: data.token,
-        isAuthenticated: true,
-        user: data.user,
-        redirect: '/c/new',
-      });
-    },
-  });
-
   const logout = useCallback(
     (redirect?: string) => {
       if (redirect) {
@@ -178,6 +165,23 @@ const AuthContextProvider = ({
     },
     [logoutUser],
   );
+
+  const { enabled: outerscoreEnabled } = useOuterscoreAutoLogin({
+    isAuthenticated,
+    currentUserId: user?.id,
+    onSuccess: (data) => {
+      setError(undefined);
+      setUserContext({
+        token: data.token,
+        isAuthenticated: true,
+        user: data.user,
+        redirect: '/c/new',
+      });
+    },
+    onUserSwitch: () => {
+      logoutUser.mutate(undefined);
+    },
+  });
 
   const userQuery = useGetUserQuery({ enabled: !!(token ?? '') });
 
@@ -249,7 +253,7 @@ const AuthContextProvider = ({
       doSetError(undefined);
     }
     if (token == null || !token || !isAuthenticated) {
-      if (outerscoreEnabled && outerscorePending) {
+      if (outerscoreEnabled) {
         return;
       }
       silentRefresh();
@@ -266,7 +270,6 @@ const AuthContextProvider = ({
     silentRefresh,
     setUserContext,
     outerscoreEnabled,
-    outerscorePending,
   ]);
 
   useEffect(() => {
@@ -285,6 +288,17 @@ const AuthContextProvider = ({
       window.removeEventListener('tokenUpdated', handleTokenUpdate as EventListener);
     };
   }, [setUserContext, user]);
+
+  useEffect(() => {
+    if (!outerscoreEnabled) return;
+    const handleOuterscoreLogout = () => {
+      logoutUser.mutate(undefined);
+    };
+    window.addEventListener('outerscore:logout', handleOuterscoreLogout);
+    return () => {
+      window.removeEventListener('outerscore:logout', handleOuterscoreLogout);
+    };
+  }, [outerscoreEnabled, logoutUser]);
 
   const memoedValue = useMemo(
     () => ({
