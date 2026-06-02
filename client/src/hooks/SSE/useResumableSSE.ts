@@ -298,6 +298,9 @@ export default function useResumableSSE(
 
           if (data.event != null) {
             stepHandler(data, { ...currentSubmission, userMessage } as EventSubmission);
+            // Agents endpoint streams text deltas through stepHandler — forward each one
+            // to the canvas so it animates live (no-op until the assistant text grows).
+            forwardCanvasStream();
             return;
           }
 

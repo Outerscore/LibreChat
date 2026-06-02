@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo, useCallback, useEffect } from 'react';
 import { ContentTypes } from 'librechat-data-provider';
 import type {
   TMessageContentParts,
@@ -9,6 +9,12 @@ import type {
 import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
 import { mapAttachments, groupSequentialToolCalls } from '~/utils';
 import { MessageContext, SearchContext } from '~/Providers';
+import {
+  CanvasWritingIndicator,
+  CanvasDoneIndicator,
+  isCanvas2Mode,
+  postCanvasContent,
+} from './CanvasStatus';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
 import ToolCallGroup from './ToolCallGroup';
@@ -144,6 +150,25 @@ const ContentParts = memo(function ContentParts({
       messageId,
     ],
   );
+
+  // Canvas2 mode: keep the canvas in sync with the active (last) assistant message when
+  // it changes outside of live streaming — e.g. switching regenerate siblings — so the
+  // prev/next arrows actually swap the canvas content.
+  useEffect(() => {
+    if (isCreatedByUser || edit === true || !isLast || !isCanvas2Mode()) {
+      return;
+    }
+    if (effectiveIsSubmitting) {
+      return;
+    }
+    postCanvasContent(content);
+  }, [content, isCreatedByUser, edit, isLast, effectiveIsSubmitting]);
+
+  // Canvas2 mode: never render assistant content in the chat panel — show a status
+  // placeholder instead (the result lives in the canvas). Edit mode is exempt.
+  if (!isCreatedByUser && edit !== true && isCanvas2Mode()) {
+    return effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
+  }
 
   // Early return: no content
   if (!content) {
