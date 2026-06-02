@@ -28,10 +28,17 @@ const buildCanvasPrompt = (userText: string): string => {
     return userText;
   }
   const trimmed = canvas.trim();
+  const complianceClause = [
+    '',
+    'After the document, append a single compliance envelope on a new line:',
+    '<compliance>{"findings":[{"text":"<verbatim span from the document>","severity":"HIGH|MODERATE|LOW","reason":"<short explanation>"}]}</compliance>',
+    'If there is nothing to flag, append <compliance>{"findings":[]}</compliance>. The envelope is the last thing in the reply — no commentary after it.',
+  ].join('\n');
   if (!trimmed) {
     return [
       'You are editing a document on a canvas. The document is currently empty.',
       'Respond with the complete document content in Markdown only — no preamble, no commentary, no code fences.',
+      complianceClause,
       '',
       `Instruction: ${userText}`,
     ].join('\n');
@@ -43,6 +50,7 @@ const buildCanvasPrompt = (userText: string): string => {
     '---',
     '',
     'Apply the instruction below and respond with the complete updated document in Markdown only — no preamble, no commentary, no code fences.',
+    complianceClause,
     '',
     `Instruction: ${userText}`,
   ].join('\n');

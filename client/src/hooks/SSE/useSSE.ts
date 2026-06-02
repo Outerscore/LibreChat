@@ -13,13 +13,62 @@ import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
 import store from '~/store';
 
+type ComplianceSeverity = 'HIGH' | 'MODERATE' | 'LOW';
+
+interface ComplianceFinding {
+  text: string;
+  severity: ComplianceSeverity;
+  reason: string;
+}
+
 type CanvasStreamMessage =
   | { type: 'outerscore:stream-start' }
   | { type: 'outerscore:stream-chunk'; chunk: string; accumulated: string }
   | { type: 'outerscore:stream-end'; accumulated: string }
-  | { type: 'outerscore:canvas-complete' };
+  | { type: 'outerscore:canvas-complete' }
+  | { type: 'outerscore:compliance-result'; findings: ComplianceFinding[] };
 
 const CANVAS_PLACEHOLDER_TEXT = '✍️ Content written to canvas.';
+const COMPLIANCE_ENVELOPE = /<compliance>([\s\S]*?)<\/compliance>/;
+
+const SEVERITIES: Set<string> = new Set(['HIGH', 'MODERATE', 'LOW']);
+
+const parseComplianceEnvelope = (text: string): {
+  findings: ComplianceFinding[];
+  stripped: string;
+} => {
+  const match = text.match(COMPLIANCE_ENVELOPE);
+  if (!match) {
+    return { findings: [], stripped: text };
+  }
+  let findings: ComplianceFinding[] = [];
+  try {
+    const parsed = JSON.parse(match[1]);
+    if (Array.isArray(parsed?.findings)) {
+      findings = parsed.findings.reduce<ComplianceFinding[]>((acc, item) => {
+        if (
+          item &&
+          typeof item.text === 'string' &&
+          typeof item.severity === 'string' &&
+          typeof item.reason === 'string' &&
+          SEVERITIES.has(item.severity.toUpperCase())
+        ) {
+          acc.push({
+            text: item.text,
+            severity: item.severity.toUpperCase() as ComplianceSeverity,
+            reason: item.reason,
+          });
+        }
+        return acc;
+      }, []);
+    }
+  } catch {
+    /* malformed envelope — treat as no findings, keep original text */
+    return { findings: [], stripped: text };
+  }
+  const stripped = text.slice(0, match.index).concat(text.slice((match.index ?? 0) + match[0].length)).trim();
+  return { findings, stripped };
+};
 
 const extractMessageText = (message: TMessage | undefined | null): string => {
   if (!message) {
@@ -229,7 +278,12 @@ export default function useSSE(
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
         forwardCanvasStream();
         if (shouldPostToCanvas) {
-          postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
+          const { findings, stripped } = parseComplianceEnvelope(accumulatedText);
+          const accumulatedForHost = findings.length > 0 || stripped !== accumulatedText ? stripped : accumulatedText;
+          postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedForHost });
+          if (findings.length > 0 || stripped !== accumulatedText) {
+            postToCanvas({ type: 'outerscore:compliance-result', findings });
+          }
           replaceLastAssistantWithPlaceholder();
           postToCanvas({ type: 'outerscore:canvas-complete' });
         }
