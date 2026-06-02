@@ -70,7 +70,6 @@ All messages are `{ type: 'outerscore:...', ... }`. Origins are strictly checked
 | `outerscore:handshake` | `{ token, context }` | SSO bridge — exchange Outerscore JWT for LibreChat session |
 | `outerscore:canvas-context` | `{ content }` | Push the latest editor plain-text. Re-posted on **every** edit so Claude's next reply sees the fresh document. |
 | `outerscore:logout` | — | Clear `outerscore:token` + `outerscore:canvas-content` in sessionStorage |
-| `outerscore:request-compliance` | — | *(S5, planned)* Ask the fork to re-run a compliance pass against the current `canvas-content` |
 
 ### iframe → parent
 
@@ -85,7 +84,7 @@ All messages are `{ type: 'outerscore:...', ... }`. Origins are strictly checked
 | `outerscore:canvas-complete` | — | Final canvas state written (post-stream housekeeping) |
 | `outerscore:content` | `{ html }` | Completed document (switch between regenerated siblings) |
 | `outerscore:navigate` | `{ page, resourceId }` | AI asked to navigate the host (handler is informational today) |
-| `outerscore:compliance-result` | `{ findings }` | *(S5, planned)* Findings parsed from the `<compliance>…</compliance>` envelope |
+| `outerscore:compliance-result` | `{ findings }` | Findings parsed from the `<compliance>…</compliance>` envelope at stream-end |
 
 ---
 
@@ -126,21 +125,24 @@ Current call sites stamp:
 
 ---
 
-## Compliance envelope (S5, planned)
+## Compliance envelope (S5)
 
-When the host posts `outerscore:request-compliance`, the fork's submit hook prepends a system instruction telling Claude to reply with **only** a tagged JSON envelope:
+Compliance findings ride **in-band** with the canvas reply — no separate round-trip. `buildCanvasPrompt` (`client/src/hooks/Messages/useSubmitMessage.ts`) instructs Claude to append a tagged JSON envelope at the end of every canvas-mode response:
 
 ```
-<compliance>{"findings":[{"text":"<verbatim span from the document>","severity":"HIGH|MODERATE|LOW","reason":"..."}, ...]}</compliance>
+<compliance>{"findings":[{"text":"<verbatim span from the document>","severity":"HIGH|MODERATE|LOW","reason":"..."}]}</compliance>
 ```
 
-`useSSE.ts` parses on `stream-end`. If a well-formed envelope is found, it posts `outerscore:compliance-result` to the parent and **suppresses** the regular `stream-chunk` markdown for that turn so the chat thread doesn't fill up with raw JSON. Parse failure falls back to "no findings, regular reply".
+An empty findings array is required when there is nothing to flag, so the envelope is always present and the host can rely on it.
+
+`useSSE.ts → parseComplianceEnvelope` strips the envelope from the stream-end accumulated text **before** posting `outerscore:stream-end`, then posts a separate `outerscore:compliance-result` with the parsed findings. The host's markdown preview and editor therefore never see the raw JSON. Malformed envelopes are tolerated — the original text passes through with no findings.
 
 Frontend rendering:
-- `AiAssistantPanelService.findings = signal<ComplianceFinding[]>([])` — set on receipt, cleared on next `open()` / `close()`.
-- New `ai-compliance-findings.component.ts` in the lib renders the severity-coloured list inside `LibrechatSidePanelComponent` below the markdown preview.
-- A new helper on `BlockStyleEditorComponent` (or sibling directive) wraps `text` matches with `<mark class="os-compliance-mark os-compliance-mark--{severity}">`. Removed on next stream or on user edit of the block (so marks never persist into saved content).
+- `AiAssistantPanelService.findings = signal<ComplianceFinding[]>([])` — set on receipt, cleared on `open()` / `close()`.
+- `AiComplianceFindingsComponent` (lib, standalone) renders the severity-coloured list inside `LibrechatSidePanelComponent` below the markdown preview. Hidden when there are no findings.
+- `ComplianceHighlightDirective` (lib, standalone, selector `[osComplianceHighlight]`) wraps `text` matches with `<mark class="os-compliance-mark os-compliance-mark--{severity}">` on the editor's host element. Marks are stripped before the next findings emission so they never persist into saved content. Applied to both the Project Brief editor (in `BlockStyleEditorDrawerComponent`) and the Deliverable description editor.
 - `ComplianceFinding` model lives in `outerscore-components-lib/src/lib/models/ai-compliance.model.ts`, reusing the existing `ComplianceRisk` enum.
+- Global mark styling lives in `outerscore-components-lib/src/lib/styles/_ai-compliance-mark.scss`, loaded via the lib styles entry so EditorJS's unencapsulated DOM picks it up.
 
 ---
 

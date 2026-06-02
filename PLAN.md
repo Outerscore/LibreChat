@@ -18,7 +18,7 @@ S1 ✅  Project Brief drawer in the creation wizard — AI toggle wired
 S2 ✅  Deliverable description editor — inline AI toggle + duplex context
 S3 ✅  Step 1 floating AI launcher (visual stub, pin/unpin persisted)
 S4 ✅  Canvas-page gating extended so SOW pages get the document-aware prompt + stream
-S5 ⏳  Compliance check (envelope + side-panel list + inline highlights)
+S5 ✅  Compliance check (in-band envelope + side-panel list + inline highlights)
 ```
 
-Stages land as separate commits on the same branch in both repos. Per the PO doc, S1–S4 are sign-off-able now; S5 is the remaining work.
+Stages land as separate commits on the same branch in both repos. All five are sign-off-able now.
