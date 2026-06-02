@@ -2,9 +2,11 @@ import type { TMessageContentParts } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 
+const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
+
 export const isCanvas2Mode = (): boolean => {
   try {
-    return sessionStorage.getItem('outerscore:page') === 'canvas2';
+    return CANVAS_PAGES.has(sessionStorage.getItem('outerscore:page') ?? '');
   } catch {
     return false;
   }

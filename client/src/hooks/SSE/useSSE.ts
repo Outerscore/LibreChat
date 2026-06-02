@@ -124,13 +124,14 @@ export default function useSSE(
     let accumulatedText = '';
     let canvasStreamStarted = false;
     const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    let isCanvas2 = false;
+    const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
+    let isCanvasPage = false;
     try {
-      isCanvas2 = sessionStorage.getItem('outerscore:page') === 'canvas2';
+      isCanvasPage = CANVAS_PAGES.has(sessionStorage.getItem('outerscore:page') ?? '');
     } catch {
       /* ignore */
     }
-    const shouldPostToCanvas = isInIframe && isCanvas2;
+    const shouldPostToCanvas = isInIframe && isCanvasPage;
     const postToCanvas = (message: CanvasStreamMessage) => {
       if (!shouldPostToCanvas) {
         return;

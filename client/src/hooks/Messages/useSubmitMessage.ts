@@ -8,17 +8,23 @@ import store from '~/store';
 
 const CANVAS_CONTEXT_KEY = 'outerscore:canvas-content';
 const CANVAS_PAGE_KEY = 'outerscore:page';
+const CANVAS_PAGES = new Set([
+  'canvas2',
+  'sow-project-brief',
+  'sow-deliverable-description',
+]);
 
 const buildCanvasPrompt = (userText: string): string => {
   let canvas = '';
-  let isCanvas2 = false;
+  let isCanvas = false;
   try {
-    isCanvas2 = sessionStorage.getItem(CANVAS_PAGE_KEY) === 'canvas2';
+    const page = sessionStorage.getItem(CANVAS_PAGE_KEY) ?? '';
+    isCanvas = CANVAS_PAGES.has(page);
     canvas = sessionStorage.getItem(CANVAS_CONTEXT_KEY) ?? '';
   } catch {
     return userText;
   }
-  if (!isCanvas2) {
+  if (!isCanvas) {
     return userText;
   }
   const trimmed = canvas.trim();
