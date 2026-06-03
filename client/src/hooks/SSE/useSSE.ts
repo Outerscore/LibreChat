@@ -33,6 +33,38 @@ type CanvasStreamMessage =
 
 const CANVAS_PLACEHOLDER_TEXT = '✍️ Content written to canvas.';
 const COMPLIANCE_ENVELOPE = /<compliance>([\s\S]*?)<\/compliance>/;
+const DOC_OPEN = '<document>';
+const DOC_CLOSE = '</document>';
+
+/**
+ * Per-turn canvas intent. A reply is treated as document work only when it
+ * begins with `<document>`; anything else is a normal chat reply and is left
+ * untouched in the chat thread. Returns 'pending' while the streamed prefix is
+ * still a possible start of the opening tag.
+ */
+type CanvasIntent = 'pending' | 'yes' | 'no';
+
+const detectCanvasIntent = (text: string): CanvasIntent => {
+  const t = text.replace(/^\s+/, '');
+  if (t.length === 0) {
+    return 'pending';
+  }
+  if (t.startsWith(DOC_OPEN)) {
+    return 'yes';
+  }
+  return DOC_OPEN.startsWith(t) ? 'pending' : 'no';
+};
+
+/** Extract the document body (between the tags) from a document-mode reply. */
+const extractDocBody = (text: string): string => {
+  const t = text.replace(/^\s+/, '');
+  let body = t.startsWith(DOC_OPEN) ? t.slice(DOC_OPEN.length) : t;
+  const closeIdx = body.indexOf(DOC_CLOSE);
+  if (closeIdx !== -1) {
+    body = body.slice(0, closeIdx);
+  }
+  return body;
+};
 
 const SEVERITIES: Set<string> = new Set(['HIGH', 'MODERATE', 'LOW']);
 
@@ -177,8 +209,10 @@ export default function useSSE(
     payload = removeNullishValues(payload) as TPayload;
 
     let textIndex = null;
-    let accumulatedText = '';
+    let rawText = '';
+    let sentDocBody = '';
     let canvasStreamStarted = false;
+    let canvasIntent: CanvasIntent = 'pending';
     const isInIframe = typeof window !== 'undefined' && window.parent !== window;
     const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
     let isCanvasPage = false;
@@ -187,9 +221,11 @@ export default function useSSE(
     } catch {
       /* ignore */
     }
-    const shouldPostToCanvas = isInIframe && isCanvasPage;
+    // Page must be canvas-capable; whether a given turn actually drives the
+    // canvas is decided per-reply by canvasIntent (the <document> marker).
+    const canvasCapable = isInIframe && isCanvasPage;
     const postToCanvas = (message: CanvasStreamMessage) => {
-      if (!shouldPostToCanvas) {
+      if (!canvasCapable) {
         return;
       }
       window.parent.postMessage(message, '*');
@@ -245,7 +281,7 @@ export default function useSSE(
     });
 
     const forwardCanvasStream = () => {
-      if (!shouldPostToCanvas) {
+      if (!canvasCapable) {
         return;
       }
       const msgs = getMessages() ?? [];
@@ -254,19 +290,35 @@ export default function useSSE(
         return;
       }
       const currentText = extractMessageText(last);
-      if (!currentText || currentText.length <= accumulatedText.length) {
+      if (!currentText) {
+        return;
+      }
+      rawText = currentText;
+      if (canvasIntent === 'no') {
+        return;
+      }
+      if (canvasIntent === 'pending') {
+        canvasIntent = detectCanvasIntent(currentText);
+        // Still ambiguous, or confirmed a plain chat reply → don't touch canvas.
+        if (canvasIntent !== 'yes') {
+          return;
+        }
+      }
+      // Document reply: stream only the body inside <document>…</document>.
+      const body = extractDocBody(currentText);
+      if (body.length <= sentDocBody.length) {
         return;
       }
       if (!canvasStreamStarted) {
         canvasStreamStarted = true;
         postToCanvas({ type: 'outerscore:stream-start' });
       }
-      const chunk = currentText.slice(accumulatedText.length);
-      accumulatedText = currentText;
+      const chunk = body.slice(sentDocBody.length);
+      sentDocBody = body;
       postToCanvas({
         type: 'outerscore:stream-chunk',
         chunk,
-        accumulated: accumulatedText,
+        accumulated: body,
       });
     };
 
@@ -284,15 +336,20 @@ export default function useSSE(
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
         forwardCanvasStream();
-        if (shouldPostToCanvas) {
-          const { findings, stripped } = parseComplianceEnvelope(accumulatedText);
-          const accumulatedForHost = findings.length > 0 || stripped !== accumulatedText ? stripped : accumulatedText;
-          postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedForHost });
-          if (findings.length > 0 || stripped !== accumulatedText) {
-            postToCanvas({ type: 'outerscore:compliance-result', findings });
+        if (canvasCapable) {
+          if (canvasIntent === 'pending') {
+            canvasIntent = detectCanvasIntent(rawText);
           }
-          replaceLastAssistantWithPlaceholder();
-          postToCanvas({ type: 'outerscore:canvas-complete' });
+          // Only a document reply drives the canvas; a normal chat reply is
+          // left in the thread untouched (no stream-end, no placeholder).
+          if (canvasIntent === 'yes') {
+            const { findings } = parseComplianceEnvelope(rawText);
+            const body = extractDocBody(rawText);
+            postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
+            postToCanvas({ type: 'outerscore:compliance-result', findings });
+            replaceLastAssistantWithPlaceholder();
+            postToCanvas({ type: 'outerscore:canvas-complete' });
+          }
         }
         console.log('final', data);
         return;

@@ -88,9 +88,11 @@ All messages are `{ type: 'outerscore:...', ... }`. Origins are strictly checked
 
 ---
 
-## Canvas-page gating
+## Canvas-page gating — two gates
 
-The fork only applies the document-aware system prompt and only broadcasts `stream-*` messages when `sessionStorage['outerscore:page']` is in the allow-list:
+There are **two** gates, and both must pass before a reply drives the editor canvas.
+
+**Gate 1 — page (capability).** `sessionStorage['outerscore:page']` must be in the allow-list:
 
 ```
 canvas2
@@ -99,6 +101,15 @@ sow-deliverable-description
 ```
 
 Source of truth: `CANVAS_PAGES` sets in `client/src/hooks/Messages/useSubmitMessage.ts`, `client/src/hooks/SSE/useSSE.ts`, `client/src/components/Chat/Messages/Content/CanvasStatus.tsx`. Add new pages in all three places.
+
+**Gate 2 — intent (per turn).** Being on a canvas page does **not** mean every reply is document work. The chat is a normal assistant by default; a reply only goes to the canvas when the model decides the user asked for document work and wraps its output in `<document>…</document>`.
+
+- The system prompt (`buildSpecPrompt`) tells the model: *write/rewrite/update the document → reply is `<document>…</document>` + `<compliance>…` and nothing else; otherwise reply as normal chat with no tags.*
+- `useSSE.ts` detects intent per turn via `detectCanvasIntent(text)` → `'pending' | 'yes' | 'no'`, decided as soon as the streamed prefix can confirm/exclude a leading `<document>` tag.
+  - `'yes'` → stream **only the document body** (`extractDocBody`) into the canvas, parse the trailing `<compliance>` envelope, then replace the chat bubble with the "✍️ Content written to canvas." placeholder.
+  - `'no'` / unresolved `'pending'` → do nothing canvas-related; the reply stays in the chat thread as an ordinary message.
+
+Net effect: ask "what's a fair day rate?" on the Project Brief page and you get a normal chat answer; ask "draft the brief" and the document streams into the canvas. Nothing reaches EditorJS until the user clicks **Insert into editor** regardless.
 
 ---
 

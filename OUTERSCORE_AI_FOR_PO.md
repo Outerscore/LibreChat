@@ -146,6 +146,17 @@ disappear; the user keeps editing.
 Where the right fix is "delete this" or "rewrite from scratch", no
 suggestion is offered and the user uses the chat for that.
 
+### Chat vs. canvas — the assistant knows the difference
+
+Sitting next to an editor does **not** turn every message into a document
+edit. The assistant stays a normal chat by default: ask it "what's a fair
+day rate for this role?" or "is this scope realistic?" and you get a plain
+answer in the chat. Only when you ask it to **write, rewrite, update,
+translate, shorten or expand the document** does it switch into canvas mode
+— the generated content streams into the preview, and nothing lands in the
+editor until you click *Insert into editor*. The user never flips a switch;
+the assistant decides from what you asked.
+
 ## 5. What we deliberately do *not* do (yet)
 
 | Item | Why we parked it |
@@ -194,6 +205,7 @@ suggestion is offered and the user uses the chat for that.
 | (TBC) | Should temp/contingent description fields be migrated to BlockStyleEditor in this scope? | No — parked. |
 | (TBC) | Should AI sessions persist in the Outerscore backend? | No for the demo. Separate ticket. |
 | (TBC) | Where does the iframe keep the Outerscore access token? | **In memory only.** The parent re-sends it on every iframe boot and on token refresh, so the iframe never needs sessionStorage/localStorage. Cuts the XSS exfiltration window to "live tab, script already running" and applies to the demo as well as production. Long-term goal is to drop bearer-in-JS entirely once the same-origin reverse-proxy deploy lands (first-party `HttpOnly` cookie). |
+| (TBC) | Is canvas mode always on when next to an editor? | **No — intent-driven.** The assistant replies as a normal chat unless the user asks it to write/update the document, in which case it wraps output in a `<document>` marker that the host streams into the canvas. Detected from the request, no user toggle. |
 
 ---
 
