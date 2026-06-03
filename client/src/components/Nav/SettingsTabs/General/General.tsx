@@ -5,6 +5,7 @@ import { Dropdown, ThemeContext } from '@librechat/client';
 import ArchivedChats from './ArchivedChats';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLocalize } from '~/hooks';
+import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import store from '~/store';
 
 const toggleSwitchConfigs = [
@@ -180,9 +181,13 @@ function General() {
 
   return (
     <div className="flex flex-col gap-3 p-1 text-sm text-text-primary">
-      <div className="pb-3">
-        <ThemeSelector theme={theme} onChange={changeTheme} />
-      </div>
+      {/* Theme switch is hidden when embedded — the chat follows the
+          Outerscore host palette, so a user-facing theme toggle would fight it. */}
+      {!isOuterscoreContext() && (
+        <div className="pb-3">
+          <ThemeSelector theme={theme} onChange={changeTheme} />
+        </div>
+      )}
       <div className="pb-3">
         <LangSelector langcode={langcode} onChange={changeLang} />
       </div>
