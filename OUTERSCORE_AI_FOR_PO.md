@@ -197,6 +197,8 @@ real layout and only align the styling.
 | C2 | Deliverable drawer — description editor header | New AI sparkle button (D2) appears next to the description's actions row. Other actions (comments, history) unchanged. |
 | C3 | SOW Requisition Step 1 (`job-add-general`) | `.step-container` becomes positioning-relative + reserves a 280px right gutter while pinned. Page content reflows; no other field changes. |
 | C4 | Side-panel "Insert into editor" / "Discard" preview pane | **Removed.** AI content writes live into the editor; revert is via Stop / Ctrl+Z. |
+| C5 | LibreChat Settings → General → light/dark theme switch | **Hidden when embedded.** The chat always renders against the Outerscore host palette; a user-facing theme flip would fight the re-skin. Standalone LibreChat keeps the switch. |
+| C6 | Initial theme of the embedded chat | **Pinned to light** regardless of the user's previous LibreChat preference or operating-system dark-mode. Enforced before the chat boots, so there is no flash of dark. Standalone LibreChat is unaffected. |
 
 ### 5.3 What is **not** changing (deliberate)
 
@@ -263,6 +265,7 @@ real layout and only align the styling.
 | (TBC) | Where does the iframe keep the Outerscore access token? | **In memory only.** The parent re-sends it on every iframe boot and on token refresh, so the iframe never needs sessionStorage/localStorage. Cuts the XSS exfiltration window to "live tab, script already running" and applies to the demo as well as production. Long-term goal is to drop bearer-in-JS entirely once the same-origin reverse-proxy deploy lands (first-party `HttpOnly` cookie). |
 | (TBC) | Is canvas mode always on when next to an editor? | **No — intent-driven.** The assistant replies as a normal chat unless the user asks it to write/update the document, in which case it wraps output in a `<document>` marker that the host streams into the canvas. Detected from the request, no user toggle. |
 | (TBC) | Keep the "Insert into editor" confirmation step? | **No — removed.** AI content is written live, block by block, directly into the editor as it streams. Revert via Stop (mid-stream) or Ctrl+Z (after). Decided with PO. |
+| (TBC) | Should the embedded chat support a light/dark theme switch? | **No.** The switch is hidden when embedded and the initial theme is pinned to light, so the chat always matches the Outerscore host palette. Standalone LibreChat keeps its own theme controls. Decided with PO. |
 
 ---
 
