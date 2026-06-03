@@ -4,6 +4,11 @@ import './locales/i18n';
 import App from './App';
 import './style.css';
 import './mobile.css';
+// Outerscore design-system alignment — vendored --os-* tokens + a remap of
+// LibreChat's semantic CSS variables onto them. Imported AFTER style.css so the
+// :root overrides win. Re-skin only (colours/fonts), no layout change.
+import './style/outerscore-tokens.css';
+import './style/outerscore.css';
 import { ApiErrorBoundaryProvider } from './hooks/ApiErrorBoundaryContext';
 import { setOuterscoreToken, clearOuterscoreToken } from './utils/outerscoreToken';
 import 'katex/dist/katex.min.css';
@@ -30,6 +35,22 @@ try {
       if (data.type === 'outerscore:handshake' && typeof data.token === 'string') {
         setOuterscoreToken(data.token);
         window.dispatchEvent(new CustomEvent('outerscore:token-ready'));
+      }
+      if (data.type === 'outerscore:theme' && data.vars && typeof data.vars === 'object') {
+        // The host owns the live palette; mirror its --color-* values as inline
+        // CSS variables so the embedded chat matches the running app (and any
+        // runtime theme switch). Inline :root vars override outerscore-tokens.css.
+        const root = document.documentElement;
+        Object.entries(data.vars).forEach(([name, value]) => {
+          if (
+            typeof name === 'string' &&
+            name.startsWith('--color-') &&
+            typeof value === 'string' &&
+            value
+          ) {
+            root.style.setProperty(name, value);
+          }
+        });
       }
       if (data.type === 'outerscore:canvas-context' && typeof data.content === 'string') {
         try {

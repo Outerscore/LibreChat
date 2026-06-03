@@ -11,7 +11,8 @@ module.exports = {
   darkMode: ['class'],
   theme: {
     fontFamily: {
-      sans: ['Inter', 'sans-serif'],
+      // Outerscore design-system alignment — match the host app font (Roboto).
+      sans: ['Roboto', 'Helvetica Neue', 'sans-serif'],
       mono: ['Roboto Mono', 'monospace'],
     },
     // fontFamily: {

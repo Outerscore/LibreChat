@@ -1,0 +1,62 @@
+/**
+ * Outerscore palette — fallback for the LibreChat fork.
+ *
+ * The live palette is pushed by the Outerscore host via the `outerscore:theme`
+ * postMessage (see main.jsx) so the embedded chat always matches whatever the
+ * host app is running. These vendored values are only the pre-handshake /
+ * standalone fallback, copied verbatim from the host's source of truth:
+ *   outerscore/frontend → projects/main-app/src/global-styles/_variables.scss
+ *
+ * Namespace is `--color-*` to match the host exactly (this branch predates the
+ * `--os-*` Cosmic migration). Re-skin only — no layout.
+ */
+
+:root {
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+
+  /* Brand (Outerscore blue) */
+  --color-brand-25: #f7fbff;
+  --color-brand-50: #ecf4ff;
+  --color-brand-100: #ddeaff;
+  --color-brand-200: #c2d8ff;
+  --color-brand-300: #9cbdff;
+  --color-brand-400: #7597ff;
+  --color-brand-500: #5573ff;
+  --color-brand-600: #2a3ef4;
+  --color-brand-700: #2a38d8;
+  --color-brand-800: #2532ae;
+  --color-brand-900: #263289;
+  --color-brand-950: #161b50;
+  --color-blue-brand: var(--color-brand-500);
+
+  /* Gray */
+  --color-gray-25: #fcfcfd;
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #030712;
+
+  /* Error */
+  --color-error-50: #fef2f2;
+  --color-error-500: #fb2c36;
+  --color-error-600: #e7000b;
+
+  /* Warning */
+  --color-warning-50: #fff7ed;
+  --color-warning-500: #ff6900;
+  --color-warning-600: #f54900;
+
+  /* Success */
+  --color-success-50: #f0fdf4;
+  --color-success-500: #00c950;
+  --color-success-600: #00a63e;
+}
