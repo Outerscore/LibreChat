@@ -271,6 +271,6 @@ real layout and only align the styling.
 
 > **Maintenance rules**
 > - Each use case section is self-contained. Adding or removing one does not break the others.
-> - Acceptance criteria use Given/When/Then so QA can lift them straight into their test plan.
+> - Acceptance criteria use Given/When/Then so QA can lift them straight into their test plan — the executable version lives in `OUTERSCORE_AI_TEST_CASES.md`.
 > - The status flag (Live ✅ / Future 🅿️) is the only thing that should change as work progresses; the body of each use case stays.
 > - Open-questions log lives at the bottom so decisions don't get lost. Add a dated row when something changes — don't rewrite history.

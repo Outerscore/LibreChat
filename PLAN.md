@@ -7,7 +7,8 @@ Three concrete use cases on `claude/epic-mccarthy-7l065` (both `outerscore/front
 ## Read this first
 
 - **[`OUTERSCORE_AI_FOR_PO.md`](OUTERSCORE_AI_FOR_PO.md)** — PO-facing. Use cases, user stories, Given/When/Then acceptance criteria, **design-changes inventory** (new UI, changes to existing UI, what's not changing, open design questions), demo script, glossary, open-questions log. Read this for the *what*, *why*, and *what the user sees*.
-- **[`OUTERSCORE_AI_ARCHITECTURE.md`](OUTERSCORE_AI_ARCHITECTURE.md)** — engineer-facing. Surface map, postMessage contract, per-use-case system prompts, compliance envelope shape, apply-fix data flow, future hooks. Read this for the *how*.
+- **[`OUTERSCORE_AI_ARCHITECTURE.md`](OUTERSCORE_AI_ARCHITECTURE.md)** — engineer-facing. Surface map, postMessage contract, per-use-case system prompts, compliance envelope shape, apply-fix data flow, theming/security, future hooks. Read this for the *how*.
+- **[`OUTERSCORE_AI_TEST_CASES.md`](OUTERSCORE_AI_TEST_CASES.md)** — QA-facing. Executable test plan: setup, test data, and ID'd cases across surfacing, chat-vs-canvas, live write, compliance, apply-fix, theming, security and regression. Read this to *prove it works*.
 
 ---
 
