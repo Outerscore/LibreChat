@@ -162,8 +162,21 @@ press **Stop** while it writes, or **Ctrl+Z** afterwards.
 
 This section enumerates every visible UI change. Where a Figma frame
 exists, it's linked; everything else was built using existing Outerscore
-patterns (Cosmic palette, `ComplianceRisk` colours, the existing drawer
-chrome) and is marked **design review pending**.
+patterns (the app's own colour palette, `ComplianceRisk` colours, the
+existing drawer chrome) and is marked **design review pending**.
+
+### 5.0 The chat itself (LibreChat re-skin)
+
+The embedded chat is re-skinned to the Outerscore design system —
+**colours and fonts only, the LibreChat layout is unchanged** (this is the
+agreed "adjust, don't redesign" approach). Crucially, the palette is
+**picked up live from the Outerscore app**, not copied from Figma and not
+hardcoded: the host pushes its current colours into the chat, so the chat
+always matches the app the user is in (today the Outerscore blue; it follows
+any future palette change automatically). Font is aligned to Roboto. See the
+[Figma reference](https://www.figma.com/design/eASH9pfpus2hoPzKo8Jlm0/Buyer---Outerscore-2025?node-id=21981-33450)
+for the look — note the layout there is illustrative; we keep LibreChat's
+real layout and only align the styling.
 
 ### 5.1 New UI elements
 
@@ -174,7 +187,7 @@ chrome) and is marked **design review pending**.
 | D3 | **AI side panel** (left-docked, drag-resizable, 25% width default, 15–45% clamp; header with sparkle + "AI Assistant" + close) | Mounted at app-root; opens on D2 click, slides in from the left, pushes page content via flexbox split | None — same layout pattern as `/librechat/canvas2` POC | Design review pending |
 | D4 | **"AI is writing into the editor…" status bar** with a **Stop** button | Top of the side panel while AI is streaming into the editor (replaces the old preview pane) | None | Design review pending |
 | D5 | **Compliance findings list** (severity-coloured cards: HIGH = red border, MODERATE = amber, LOW = green; quoted text + reason + optional suggestion + *Apply fix* button) | Below the status bar, inside the side panel | None — reuses `ComplianceRisk` palette (matches `ComplianceResultItemComponent` elsewhere in the app) | Design review pending |
-| D6 | **Inline compliance highlights** (`<mark>` with severity-coloured underline + tinted background; hover shows the reason) | Wraps non-compliant fragments inside the EditorJS editor body | None — colours pulled from `--os-state-error-fg / -warning-fg / -success-fg` | Design review pending |
+| D6 | **Inline compliance highlights** (`<mark>` with severity-coloured underline + tinted background; hover shows the reason) | Wraps non-compliant fragments inside the EditorJS editor body | None — colours pulled from the app's `--color-error/warning/success-500` tokens | Design review pending |
 
 ### 5.2 Changes to existing UI
 

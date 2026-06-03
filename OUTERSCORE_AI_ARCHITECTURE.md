@@ -70,7 +70,8 @@ All messages are `{ type: 'outerscore:...', ... }`. Origins are strictly checked
 |---|---|---|
 | `outerscore:handshake` | `{ token, context }` | SSO bridge — exchange Outerscore JWT for LibreChat session |
 | `outerscore:canvas-context` | `{ content }` | Push the latest editor plain-text. Re-posted on **every** edit so Claude's next reply sees the fresh document. |
-| `outerscore:logout` | — | Clear `outerscore:token` + `outerscore:canvas-content` in sessionStorage |
+| `outerscore:theme` | `{ vars }` | Push the host's live `--color-*` palette so the embedded chat matches the running app. Sent on `outerscore:ready`. The fork applies the values as inline `:root` vars over its vendored fallback. |
+| `outerscore:logout` | — | Clear the in-memory token + `outerscore:canvas-content` in sessionStorage |
 
 ### iframe → parent
 
@@ -254,6 +255,16 @@ Behaviour: advisory. Open a pre-contract step that hosts the existing `AiComplia
 When this is built, factor the pre-contract gate into a shared helper rather than duplicating it across the two/three panel components.
 
 ---
+
+## Theming / re-skin
+
+The fork is re-skinned to the Outerscore design system — **colours and fonts only, no layout change**. LibreChat's components and structure are untouched.
+
+- **Palette source = the host app, not Figma.** `LibrechatIframeComponent.postTheme()` reads the host's computed `--color-*` values (`getComputedStyle(document.documentElement)`) and posts them via `outerscore:theme` on `outerscore:ready`. The fork's `main.jsx` applies them as inline `:root` vars. So the chat always matches whatever palette the host runs — today the blue `--color-brand-*` in `frontend → global-styles/_variables.scss`; after any future palette change it follows automatically. Do **not** hardcode Figma hex.
+- **Fallback** (`client/src/style/outerscore-tokens.css`): a vendored copy of the current `--color-*` values, used pre-handshake and for standalone (non-embedded) runs. Keep it in sync with `_variables.scss` if the host palette is re-baselined.
+- **Remap** (`client/src/style/outerscore.css`): maps LibreChat's own semantic vars (`--text-*`, `--surface-*`, `--header-*`, `--border-*`, `--brand-purple`, `--surface-submit*`, `--ring-primary`) onto `--color-*`. No hex literals.
+- **Font**: Roboto, to match the host. Set in three places — `index.html` (Google Fonts link), `tailwind.config.cjs` (`font-sans`), and a `body` rule in `outerscore.css`.
+- **Namespace note**: this branch predates the `--os-*` Cosmic token system, so everything uses `--color-*`. If/when the host migrates to `--os-*`, update `THEME_TOKENS` (host) + the remap targets here.
 
 ## Token handling
 
