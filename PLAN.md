@@ -1,24 +1,43 @@
 # Outerscore AI — current plan
 
-The work on this branch (`claude/epic-mccarthy-7l065`, both `outerscore/frontend` and `outerscore/librechat`) wires a Claude-powered LibreChat embed into the **Buyer SOW Requisition creation wizard** — Step 1 (visual stub) and Step 3 (Project Brief + per-Deliverable description, with streaming, live document context, and compliance highlighting).
+Three concrete use cases on `claude/epic-mccarthy-7l065` (both `outerscore/frontend` and `outerscore/librechat`). Two live, one parked.
 
 ---
 
 ## Read this first
 
-- **`OUTERSCORE_AI_FOR_PO.md`** — PO-facing: where the AI shows up, what each stage delivers, acceptance per stage. Read this if you want the *what* and the *why*.
-- **`OUTERSCORE_AI_ARCHITECTURE.md`** — engineer-facing: surface map, postMessage contract, file paths, canvas-page gating, compliance envelope shape. Read this if you want the *how*.
+- **[`OUTERSCORE_AI_FOR_PO.md`](OUTERSCORE_AI_FOR_PO.md)** — PO-facing. Use cases, user stories, Given/When/Then acceptance criteria, demo script, glossary, open-questions log. Read this for the *what* and *why*.
+- **[`OUTERSCORE_AI_ARCHITECTURE.md`](OUTERSCORE_AI_ARCHITECTURE.md)** — engineer-facing. Surface map, postMessage contract, per-use-case system prompts, compliance envelope shape, apply-fix data flow, future hooks. Read this for the *how*.
 
 ---
 
-## Current stage
+## Use cases
 
 ```
-S1 ✅  Project Brief drawer in the creation wizard — AI toggle wired
-S2 ✅  Deliverable description editor — inline AI toggle + duplex context
-S3 ✅  Step 1 floating AI launcher (visual stub, pin/unpin persisted)
-S4 ✅  Canvas-page gating extended so SOW pages get the document-aware prompt + stream
-S5 ✅  Compliance check (in-band envelope + side-panel list + inline highlights)
+UC1 ✅  SOW Project Brief        — generation + compliance + apply-fix
+UC2 ✅  SOW Deliverable desc.    — generation + compliance + apply-fix
+UC3 🅿️  Work Order compliance    — documented, not built this iteration
 ```
 
-Stages land as separate commits on the same branch in both repos. All five are sign-off-able now.
+## Cross-cutting capabilities
+
+```
+Live document context  ✅  every keystroke pushed to Claude's working memory
+Inline highlights      ✅  severity-coloured <mark> overlays in the editor
+Findings list          ✅  side-panel list mirrors the highlights
+Apply-fix              ✅  one-click span replacement with Claude's suggestion
+Per-use-case prompts   ✅  brief / deliverable structures are visibly different
+```
+
+## Parked (documented in detail, not built)
+
+```
+F1  Temp/contingent description AI    — prereq: convert plain text to BlockStyleEditor
+F2  Work-order pre-contract audit     — advisory, role text + contract terms
+```
+
+---
+
+## Maintaining this index
+
+When something changes status, update the checkbox here and update the corresponding *Status* line in `OUTERSCORE_AI_FOR_PO.md`. Don't rewrite history elsewhere.

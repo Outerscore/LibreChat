@@ -146,9 +146,89 @@ Frontend rendering:
 
 ---
 
+## Per-use-case system prompts
+
+`client/src/hooks/Messages/useSubmitMessage.ts` exports one prompt builder per canvas page, keyed by the iframe's `outerscore:page` sessionStorage value:
+
+```ts
+type CanvasPrompt = (userText: string, document: string) => string;
+
+const PROMPT_BY_PAGE: Record<string, CanvasPrompt> = {
+  'sow-project-brief': PROJECT_BRIEF_PROMPT,
+  'sow-deliverable-description': DELIVERABLE_DESC_PROMPT,
+  // 'wo-temp-compliance':         WO_COMPLIANCE_PROMPT,     // F2 — unused slot
+  // 'wo-contractor-compliance':   WO_COMPLIANCE_PROMPT,     // F2 — unused slot
+};
+```
+
+Every prompt template satisfies four clauses:
+
+1. **Identity** — tells Claude what the document *is* (so a Deliverable description generation doesn't return a whole brief, and vice versa).
+2. **Structure** — lists the expected sections. Brief: *Objectives* / *Scope* / *Success criteria* / *Out of scope*. Deliverable: *What* / *Acceptance criteria* / *Dependencies* / *Estimated effort*.
+3. **Output discipline** — Markdown only, no preamble, no code fences.
+4. **Compliance clause** — appends the `<compliance>{…}</compliance>` envelope with use-case-specific rules (brief → GDPR / vendor-neutrality / discriminatory wording; deliverable → vague acceptance criteria / "TBD" placeholders / missing units / unrealistic timelines). Each finding may carry a `suggestion` when a concrete rewrite is sensible.
+
+Fallback for unrecognised pages: `GENERIC_CANVAS_PROMPT` (the pre-S7 generic builder), so Step 1's placeholder canvas page (`sow-general-info`) still works.
+
+## Compliance envelope (revised)
+
+```
+<compliance>{
+  "findings": [
+    {
+      "text": "<verbatim span from the document>",
+      "severity": "HIGH|MODERATE|LOW",
+      "reason": "<short explanation>",
+      "suggestion": "<optional — concrete replacement text>"
+    }
+  ]
+}</compliance>
+```
+
+- `suggestion` is **optional**. Claude is instructed to include it only when a single, document-ready replacement is the right fix; if the right fix is "delete this" or "rewrite the whole paragraph", suggestion is omitted.
+- `useSSE.ts → parseComplianceEnvelope` accepts envelopes with or without `suggestion`.
+- The host model `ComplianceFinding` (`outerscore-components-lib/src/lib/models/ai-compliance.model.ts`) carries `suggestion?: string`.
+
+### Apply-fix data flow
+
+1. `AiComplianceFindingsComponent` renders an **Apply fix** button on each finding where `suggestion` is set.
+2. Click → `AiAssistantPanelService.applyFix(finding)` → emits via `applyFixRequested$` Subject.
+3. The active drawer (`BlockStyleEditorDrawerComponent` for UC1, `DeliverableDrawerComponent` for UC2) subscribes to `applyFixRequested$` for the lifetime of the drawer. Handler:
+   - Find the matching `<mark class="os-compliance-mark">` in the editor's host element and swap its text node for the suggestion.
+   - If no matching `<mark>` is present (e.g. the user edited the surrounding text), fall back to a string `replace(finding.text, finding.suggestion)` on the editor's value.
+   - Re-emit `valueChange` so the EditorJS block model picks up the change.
+4. `AiAssistantPanelService.findings.update(f => f.filter(item => item !== finding))` removes the applied finding from both the list and the highlight overlay.
+
+## Future hooks
+
+The architecture deliberately leaves bolt-on points for the parked work:
+
+### F1 — Temp/contingent description AI
+
+Prereqs:
+1. Convert `TEW.description` and `IndContractor.description` from `string` fields rendered as form textareas (in `service-specification-temp-work.component` and `service-specification-ind-contractor.component`) to `BlockStyleEditor` inside a `BlockStyleEditorDrawerComponent`-style flow.
+2. Pass `enableAiAssistant: true` with the appropriate `aiContext.page` (`temp-work-description`, `contractor-description`).
+3. Add matching `PROMPT_BY_PAGE` entries plus `CANVAS_PAGES` allow-list entries in `useSubmitMessage.ts`, `useSSE.ts`, `CanvasStatus.tsx`.
+
+### F2 — Work-order compliance audit (UC3)
+
+Entry points:
+- `OrderViewComponent.generateContract()` (SOW)
+- `OrderViewTempWorkPanelComponent.generateContract()` (temp work, multi-candidate)
+- The contractor equivalent on `OrderViewContractorPanelComponent`
+
+Subject: the requisition role description **plus** the contract form fields (rate, dates, capacity, working-time, contract template fields).
+
+Behaviour: advisory. Open a pre-contract step that hosts the existing `AiComplianceFindingsComponent` + apply-fix where applicable. *Apply fix* is offered only for findings that target the role description text — contract-term findings render a recommendation but no fix button (the user edits the form field manually).
+
+When this is built, factor the pre-contract gate into a shared helper rather than duplicating it across the two/three panel components.
+
+---
+
 ## Things to keep in mind
 
 - The iframe is on a separate origin; token never travels in the URL — only `postMessage` after `outerscore:ready` (security hardening from `c91bcfac`).
-- The deliverable drawer's `insertRequested$` subscription is scoped to the drawer's `DestroyRef`; opening a deliverable while a Project Brief drawer is also open will cross-talk unless those subscriptions are per-instance.
+- The deliverable drawer's `insertRequested$` and `applyFixRequested$` subscriptions are scoped to the drawer's `DestroyRef`; opening a deliverable while a Project Brief drawer is also open will cross-talk unless those subscriptions are per-instance.
 - `<compliance>` envelopes can clash with content that legitimately contains the tag. The parser is tag-pair specific and tolerates failure.
 - The duplex `outerscore:canvas-context` re-post on every edit is debounced upstream (the editor itself debounces value emissions) — no extra throttling needed on the host side, but keep it in mind if you ever hook a high-frequency source.
+- Apply-fix relies on `<mark>` overlays being present, which depends on the editor having rendered the findings since they arrived. The fallback to `value.replace` keeps it correct when the DOM is stale, but a no-op should be logged so it's visible in the console.
