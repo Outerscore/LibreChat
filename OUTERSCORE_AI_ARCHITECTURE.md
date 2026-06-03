@@ -265,6 +265,9 @@ The fork is re-skinned to the Outerscore design system — **colours and fonts o
 - **Remap** (`client/src/style/outerscore.css`): maps LibreChat's own semantic vars (`--text-*`, `--surface-*`, `--header-*`, `--border-*`, `--brand-purple`, `--surface-submit*`, `--ring-primary`) onto `--color-*`. No hex literals.
 - **Font**: Roboto, to match the host. Set in three places — `index.html` (Google Fonts link), `tailwind.config.cjs` (`font-sans`), and a `body` rule in `outerscore.css`.
 - **Namespace note**: this branch predates the `--os-*` Cosmic token system, so everything uses `--color-*`. If/when the host migrates to `--os-*`, update `THEME_TOKENS` (host) + the remap targets here.
+- **Theme pinned to light when embedded**: deterministically forces `localStorage['color-theme'] = 'light'` and strips the `.dark` class on `<html>` so the embedded chat always renders against the Outerscore host palette, regardless of the user's prior preference or system colour scheme. Done in two places:
+  - `client/index.html` inline script — writes `color-theme=light` **before** `@librechat/client`'s `ThemeContext` initializes (no flash of dark);
+  - `client/src/main.jsx` — belt-and-suspenders strip of `.dark` after React boots, in case anything re-adds it.
 - **Theme switch hidden when embedded**: LibreChat's light/dark `ThemeSelector` (Settings → General) is hidden under `isOuterscoreContext()` so a user can't flip a theme that would fight the host re-skin. Standalone LibreChat keeps it.
 
 ## Token handling

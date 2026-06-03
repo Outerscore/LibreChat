@@ -22,6 +22,17 @@ try {
   }
 
   if (window.parent !== window) {
+    // Pin theme to light when embedded — the chat follows the Outerscore host
+    // palette, so any LibreChat dark-mode class would fight the re-skin. The
+    // inline script in index.html does the same write before ThemeContext
+    // boots; this is the belt-and-suspenders strip after React has loaded.
+    try {
+      localStorage.setItem('color-theme', 'light');
+    } catch {
+      /* ignore */
+    }
+    document.documentElement.classList.remove('dark');
+
     const parentOrigin = import.meta.env.VITE_OUTERSCORE_PARENT_ORIGIN || '';
 
     window.addEventListener('message', (event) => {

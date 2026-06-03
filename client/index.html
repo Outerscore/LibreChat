@@ -25,6 +25,18 @@
       }
     </style>
     <script>
+      // Outerscore embed: when this LibreChat is rendered inside the Outerscore
+      // app iframe, pin the theme to light BEFORE @librechat/client's
+      // ThemeContext initializes off localStorage. The chat must match the host
+      // re-skin deterministically; a user's prior dark preference shouldn't
+      // bleed through. Standalone LibreChat is unaffected.
+      if (window.parent !== window) {
+        try {
+          localStorage.setItem('color-theme', 'light');
+        } catch (e) { /* localStorage unavailable — fall through */ }
+        document.documentElement.classList.remove('dark');
+      }
+
       const theme = localStorage.getItem('color-theme');
       const loadingContainerStyle = document.createElement('style');
       let backgroundColor;
