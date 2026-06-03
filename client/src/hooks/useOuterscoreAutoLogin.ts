@@ -1,28 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { dataService } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
+import {
+  getOuterscoreToken,
+  clearOuterscoreToken,
+} from '~/utils/outerscoreToken';
 
-const TOKEN_STORAGE_KEY = 'outerscore:token';
 const PAGE_STORAGE_KEY = 'outerscore:page';
 const TOKEN_READY_EVENT = 'outerscore:token-ready';
 const LOGOUT_EVENT = 'outerscore:logout';
 
-const readToken = (): string | null => {
-  try {
-    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-};
+const readToken = (): string | null => getOuterscoreToken();
 
 const isInIframe = (): boolean => typeof window !== 'undefined' && window.parent !== window;
 
 export const isOuterscoreContext = (): boolean => {
   if (!isInIframe()) return false;
   try {
-    return !!sessionStorage.getItem(PAGE_STORAGE_KEY) || !!sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    return !!sessionStorage.getItem(PAGE_STORAGE_KEY) || !!getOuterscoreToken();
   } catch {
-    return false;
+    return !!getOuterscoreToken();
   }
 };
 
@@ -112,11 +109,7 @@ export default function useOuterscoreAutoLogin({
         })
         .catch((err: unknown) => {
           setPending(false);
-          try {
-            sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-          } catch {
-            /* ignore */
-          }
+          clearOuterscoreToken();
           postToParent({ type: 'outerscore:auth-required' });
           console.warn('[outerscore] auto-login failed:', err);
         });

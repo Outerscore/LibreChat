@@ -5,6 +5,7 @@ import App from './App';
 import './style.css';
 import './mobile.css';
 import { ApiErrorBoundaryProvider } from './hooks/ApiErrorBoundaryContext';
+import { setOuterscoreToken, clearOuterscoreToken } from './utils/outerscoreToken';
 import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/copy-tex.js';
 
@@ -27,11 +28,7 @@ try {
         return;
       }
       if (data.type === 'outerscore:handshake' && typeof data.token === 'string') {
-        try {
-          sessionStorage.setItem('outerscore:token', data.token);
-        } catch {
-          /* ignore */
-        }
+        setOuterscoreToken(data.token);
         window.dispatchEvent(new CustomEvent('outerscore:token-ready'));
       }
       if (data.type === 'outerscore:canvas-context' && typeof data.content === 'string') {
@@ -42,8 +39,8 @@ try {
         }
       }
       if (data.type === 'outerscore:logout') {
+        clearOuterscoreToken();
         try {
-          sessionStorage.removeItem('outerscore:token');
           sessionStorage.removeItem('outerscore:canvas-content');
         } catch {
           /* ignore */

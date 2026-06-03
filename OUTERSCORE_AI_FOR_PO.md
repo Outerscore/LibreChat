@@ -193,6 +193,7 @@ suggestion is offered and the user uses the chat for that.
 | (TBC) | Should UC3 hard-block contract generation on HIGH findings? | Advisory in the demo, revisit later. |
 | (TBC) | Should temp/contingent description fields be migrated to BlockStyleEditor in this scope? | No — parked. |
 | (TBC) | Should AI sessions persist in the Outerscore backend? | No for the demo. Separate ticket. |
+| (TBC) | Where does the iframe keep the Outerscore access token? | **In memory only.** The parent re-sends it on every iframe boot and on token refresh, so the iframe never needs sessionStorage/localStorage. Cuts the XSS exfiltration window to "live tab, script already running" and applies to the demo as well as production. Long-term goal is to drop bearer-in-JS entirely once the same-origin reverse-proxy deploy lands (first-party `HttpOnly` cookie). |
 
 ---
 

@@ -225,9 +225,41 @@ When this is built, factor the pre-contract gate into a shared helper rather tha
 
 ---
 
+## Token handling
+
+The Outerscore JWT lives **only in memory** inside the iframe — never in
+`sessionStorage` or `localStorage`. Three properties hold:
+
+1. **Delivery is origin-pinned.** The parent posts the handshake to the
+   captured `event.origin` from `outerscore:ready`, never `'*'`.
+2. **Persistence is delegated to the parent.** On every iframe boot the
+   parent re-sends the handshake; on token refresh in the host, the
+   `accessToken` effect in `LibrechatIframeComponent` posts a fresh
+   handshake. The iframe never needs to survive a reload with the token
+   in hand.
+3. **Storage is a single module-scope variable** in
+   `client/src/utils/outerscoreToken.ts` (`getOuterscoreToken /
+   setOuterscoreToken / clearOuterscoreToken`). `main.jsx` calls
+   `setOuterscoreToken` when the handshake arrives; `useOuterscoreAutoLogin`
+   reads via `getOuterscoreToken` and clears on bridge failure or logout.
+
+Why this matters: a JS-readable store (sessionStorage, localStorage,
+IndexedDB) gives any same-origin script free access to the credential —
+LibreChat is a large third-party app with a real XSS surface, so the
+memory-only approach shrinks the exfiltration window to "live tab,
+script already running" instead of "any future code on this origin".
+
+`canvas-content` and the `os_page` route key remain in `sessionStorage`
+— they are confidential business data but not credentials, and per-tab
+scoping plus `outerscore:logout` cleanup is the right trade-off.
+
+Future hardening (when the same-origin reverse-proxy deploy in the
+roadmap lands): authenticate the chat with a first-party `HttpOnly`
+cookie and drop the bearer-in-JS path entirely.
+
 ## Things to keep in mind
 
-- The iframe is on a separate origin; token never travels in the URL — only `postMessage` after `outerscore:ready` (security hardening from `c91bcfac`).
+- The iframe is on a separate origin; token never travels in the URL — only `postMessage` after `outerscore:ready` (security hardening from `c91bcfac`), and never to JS-readable storage (the in-memory holder above).
 - The deliverable drawer's `insertRequested$` and `applyFixRequested$` subscriptions are scoped to the drawer's `DestroyRef`; opening a deliverable while a Project Brief drawer is also open will cross-talk unless those subscriptions are per-instance.
 - `<compliance>` envelopes can clash with content that legitimately contains the tag. The parser is tag-pair specific and tolerates failure.
 - The duplex `outerscore:canvas-context` re-post on every edit is debounced upstream (the editor itself debounces value emissions) — no extra throttling needed on the host side, but keep it in mind if you ever hook a high-frequency source.
