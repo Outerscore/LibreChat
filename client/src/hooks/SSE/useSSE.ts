@@ -19,7 +19,10 @@ interface ComplianceFinding {
   text: string;
   severity: ComplianceSeverity;
   reason: string;
+  suggestion?: string;
 }
+
+const SUGGESTION_MAX_LEN = 600;
 
 type CanvasStreamMessage =
   | { type: 'outerscore:stream-start' }
@@ -53,11 +56,15 @@ const parseComplianceEnvelope = (text: string): {
           typeof item.reason === 'string' &&
           SEVERITIES.has(item.severity.toUpperCase())
         ) {
-          acc.push({
+          const finding: ComplianceFinding = {
             text: item.text,
             severity: item.severity.toUpperCase() as ComplianceSeverity,
             reason: item.reason,
-          });
+          };
+          if (typeof item.suggestion === 'string' && item.suggestion.trim().length > 0) {
+            finding.suggestion = item.suggestion.slice(0, SUGGESTION_MAX_LEN);
+          }
+          acc.push(finding);
         }
         return acc;
       }, []);
