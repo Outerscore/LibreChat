@@ -6,7 +6,7 @@ Three concrete use cases on `claude/epic-mccarthy-7l065` (both `outerscore/front
 
 ## Read this first
 
-- **[`OUTERSCORE_AI_FOR_PO.md`](OUTERSCORE_AI_FOR_PO.md)** — PO-facing. Use cases, user stories, Given/When/Then acceptance criteria, demo script, glossary, open-questions log. Read this for the *what* and *why*.
+- **[`OUTERSCORE_AI_FOR_PO.md`](OUTERSCORE_AI_FOR_PO.md)** — PO-facing. Use cases, user stories, Given/When/Then acceptance criteria, **design-changes inventory** (new UI, changes to existing UI, what's not changing, open design questions), demo script, glossary, open-questions log. Read this for the *what*, *why*, and *what the user sees*.
 - **[`OUTERSCORE_AI_ARCHITECTURE.md`](OUTERSCORE_AI_ARCHITECTURE.md)** — engineer-facing. Surface map, postMessage contract, per-use-case system prompts, compliance envelope shape, apply-fix data flow, future hooks. Read this for the *how*.
 
 ---

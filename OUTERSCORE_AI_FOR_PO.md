@@ -158,7 +158,49 @@ by block, as it streams. There is no "Insert into editor" step. The user
 never flips a switch; the assistant decides from what you asked. To revert,
 press **Stop** while it writes, or **Ctrl+Z** afterwards.
 
-## 5. What we deliberately do *not* do (yet)
+## 5. Design changes — what the user actually sees
+
+This section enumerates every visible UI change. Where a Figma frame
+exists, it's linked; everything else was built using existing Outerscore
+patterns (Cosmic palette, `ComplianceRisk` colours, the existing drawer
+chrome) and is marked **design review pending**.
+
+### 5.1 New UI elements
+
+| # | Element | Where it appears | Visual reference | Status |
+|---|---|---|---|---|
+| D1 | **AI launcher chip** (sparkle icon + "Outerscore AI" label) | Step 1 *General Information* — floats over the form by default; click the pin icon to dock it on the right of the step container (reserves a 280px gutter; state persists in localStorage) | [Figma frame](https://www.figma.com/design/eASH9pfpus2hoPzKo8Jlm0/Buyer---Outerscore-2025?node-id=21704-19497) | Built to Figma |
+| D2 | **AI sparkle button** (`auto_awesome` icon, becomes brand-coloured when the panel is open) | Header of the Project Brief drawer + header strip next to the Deliverable description editor (`isEditMode` only) | None — uses existing `mat-icon-button` + brand-token colour | Design review pending |
+| D3 | **AI side panel** (left-docked, drag-resizable, 25% width default, 15–45% clamp; header with sparkle + "AI Assistant" + close) | Mounted at app-root; opens on D2 click, slides in from the left, pushes page content via flexbox split | None — same layout pattern as `/librechat/canvas2` POC | Design review pending |
+| D4 | **"AI is writing into the editor…" status bar** with a **Stop** button | Top of the side panel while AI is streaming into the editor (replaces the old preview pane) | None | Design review pending |
+| D5 | **Compliance findings list** (severity-coloured cards: HIGH = red border, MODERATE = amber, LOW = green; quoted text + reason + optional suggestion + *Apply fix* button) | Below the status bar, inside the side panel | None — reuses `ComplianceRisk` palette (matches `ComplianceResultItemComponent` elsewhere in the app) | Design review pending |
+| D6 | **Inline compliance highlights** (`<mark>` with severity-coloured underline + tinted background; hover shows the reason) | Wraps non-compliant fragments inside the EditorJS editor body | None — colours pulled from `--os-state-error-fg / -warning-fg / -success-fg` | Design review pending |
+
+### 5.2 Changes to existing UI
+
+| # | Where | What changes |
+|---|---|---|
+| C1 | Project Brief drawer header | New AI sparkle button (D2) appears next to the title in edit mode. Comments + history controls unchanged. |
+| C2 | Deliverable drawer — description editor header | New AI sparkle button (D2) appears next to the description's actions row. Other actions (comments, history) unchanged. |
+| C3 | SOW Requisition Step 1 (`job-add-general`) | `.step-container` becomes positioning-relative + reserves a 280px right gutter while pinned. Page content reflows; no other field changes. |
+| C4 | Side-panel "Insert into editor" / "Discard" preview pane | **Removed.** AI content writes live into the editor; revert is via Stop / Ctrl+Z. |
+
+### 5.3 What is **not** changing (deliberate)
+
+- LibreChat's chat surface inside the iframe — unchanged.
+- The EditorJS toolbar, block styles, and existing markdown rendering — unchanged. Compliance highlights are layered on top, not a fork of the editor.
+- Step 2 and other wizard steps — no AI surface this iteration.
+- View-mode (read-only) screens — the AI sparkle button is hidden.
+
+### 5.4 Open design questions
+
+| Date | Question | Owner |
+|---|---|---|
+| (TBC) | Are there Figma frames I should align D2–D6 to, or do we want a design review pass on what's shipped? | Design |
+| (TBC) | Should the side panel be re-positionable to the right of the editor as well as the left? Today it's left-docked only. | Design + PO |
+| (TBC) | Severity colour mapping for inline highlights — keep current `ComplianceRisk` palette or a softer AI-specific palette? | Design |
+
+## 6. What we deliberately do *not* do (yet)
 
 | Item | Why we parked it |
 |---|---|
@@ -168,7 +210,7 @@ press **Stop** while it writes, or **Ctrl+Z** afterwards.
 | Storing AI sessions in the Outerscore backend | The demo uses LibreChat's own storage. Outerscore-side persistence is a separate ticket. |
 | Hard-blocking on HIGH compliance findings | Demo experience favours speed; once usage data exists we'll revisit. |
 
-## 6. How to demo this in 5 minutes
+## 7. How to demo this in 5 minutes
 
 1. **Open the SOW Requisition wizard.** Navigate to Requisitions → New →
    choose *SOW* labour type → walk through to step 3 *Job Posting*.
@@ -190,7 +232,7 @@ press **Stop** while it writes, or **Ctrl+Z** afterwards.
 5. **Future glimpse.** Open this doc to UC3 and read the 4-row table aloud
    as a roadmap teaser.
 
-## 7. Glossary
+## 8. Glossary
 
 - **Project Brief** — the rich-text description of a SOW requisition's overall objective.
 - **Deliverable description** — the rich-text definition of one line item in a SOW deliverables table.
@@ -198,7 +240,7 @@ press **Stop** while it writes, or **Ctrl+Z** afterwards.
 - **Apply fix** — one-click replacement of a flagged fragment with Claude's suggested correction.
 - **Canvas mode** — internal name for "the AI knows it's working *on* a document, not chatting freely." Switched on automatically by the page the user is on.
 
-## 8. Open questions / decisions log
+## 9. Open questions / decisions log
 
 | Date | Question | Decision |
 |---|---|---|
