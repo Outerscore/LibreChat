@@ -23,6 +23,8 @@ UC3 🅿️  Work Order compliance    — documented, not built this iteration
 
 ```
 Live document context  ✅  every keystroke pushed to Claude's working memory
+Intent-aware canvas    ✅  chat by default; document work only on request
+Live write to editor   ✅  AI streams block-by-block into EditorJS (no Insert step)
 Inline highlights      ✅  severity-coloured <mark> overlays in the editor
 Findings list          ✅  side-panel list mirrors the highlights
 Apply-fix              ✅  one-click span replacement with Claude's suggestion

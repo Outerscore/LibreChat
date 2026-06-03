@@ -47,8 +47,8 @@ later iteration.
 | # | Given | When | Then |
 |---|---|---|---|
 | UC1-A | I'm in the Project Brief drawer of a SOW requisition I'm creating or editing | I click the AI sparkle icon next to the drawer's title | The Outerscore AI panel slides in on the left of the screen with the brief's current content already loaded as context |
-| UC1-B | The AI panel is open and the brief is empty | I type "Draft a project brief for a 6-month migration project to AWS" and send | A markdown brief streams into the preview pane, structured with Objectives / Scope / Success criteria / Out of scope |
-| UC1-C | The AI has finished drafting | I click "Insert into editor" | The drafted content is appended to the Project Brief editor as proper blocks (headings, lists, paragraphs), not raw markdown |
+| UC1-B | The AI panel is open and the brief is empty | I type "Draft a project brief for a 6-month migration project to AWS" and send | The brief is written **live, block by block, directly into the Project Brief editor** — proper headings/lists/paragraphs (not raw markdown), structured as Objectives / Scope / Success criteria / Out of scope. No "Insert" step. |
+| UC1-C | The AI is writing into the editor | I click "Stop" (or press Ctrl+Z afterwards) | Writing halts at the current point / the AI's write is undone. The content is in the editor as soon as it streams — there is no separate confirm/insert action. |
 | UC1-D | I have an existing brief and ask "Tighten the success criteria" | The AI responds | The reply rewrites the *whole* brief with sharper success criteria — not a chat-style answer |
 | UC1-E | The brief contains a discriminatory or non-compliant fragment | The AI finishes the reply | A compliance findings list appears under the preview with a severity badge per finding, and the same fragments are highlighted inline in the editor with a matching colour |
 | UC1-F | A finding shows an "Apply fix" button | I click it | The highlighted fragment in the editor is replaced by Claude's suggested correction, the highlight disappears, and the finding drops off the list |
@@ -71,7 +71,7 @@ later iteration.
 | # | Given | When | Then |
 |---|---|---|---|
 | UC2-A | I have opened a Deliverable for editing in the Deliverable drawer | I click the AI sparkle icon next to the description editor | The Outerscore AI panel opens with that deliverable's description loaded as context, plus the deliverable's name/label so the AI's reply is scoped to this one item |
-| UC2-B | I ask "Draft the description for this deliverable" | The AI responds | The reply is structured as *What*, *Acceptance criteria*, *Dependencies*, *Estimated effort* — not a project-brief structure |
+| UC2-B | I ask "Draft the description for this deliverable" | The AI responds | The description is written **live, directly into the deliverable's description editor**, structured as *What*, *Acceptance criteria*, *Dependencies*, *Estimated effort* — not a project-brief structure. No "Insert" step; Stop/undo to revert. |
 | UC2-C | I open a second Deliverable while the panel is open | The panel updates | The AI's context is reloaded for the newly opened deliverable; replies are scoped to it; the previous deliverable's drafts do not leak |
 | UC2-D | The drafted description contains a vague acceptance criterion ("works well") | The AI finishes | The finding appears with a severity, a quoted snippet, and (where possible) a suggested replacement |
 | UC2-E | I click "Apply fix" on a deliverable finding | — | The highlighted span is replaced in place; the editor's saved value reflects the corrected text on next save |
@@ -153,9 +153,10 @@ edit. The assistant stays a normal chat by default: ask it "what's a fair
 day rate for this role?" or "is this scope realistic?" and you get a plain
 answer in the chat. Only when you ask it to **write, rewrite, update,
 translate, shorten or expand the document** does it switch into canvas mode
-— the generated content streams into the preview, and nothing lands in the
-editor until you click *Insert into editor*. The user never flips a switch;
-the assistant decides from what you asked.
+— and then the content is written **live, straight into the editor**, block
+by block, as it streams. There is no "Insert into editor" step. The user
+never flips a switch; the assistant decides from what you asked. To revert,
+press **Stop** while it writes, or **Ctrl+Z** afterwards.
 
 ## 5. What we deliberately do *not* do (yet)
 
@@ -174,10 +175,10 @@ the assistant decides from what you asked.
 2. **UC1 — Project Brief.** Click *Edit* on the Project Brief panel to open
    its drawer. Click the AI sparkle icon. Side panel slides in. Ask *"Draft
    a brief for a 6-month migration of our finance ERP to a SaaS platform,
-   including one ambiguous deadline."* Watch the markdown stream into the
-   preview. Click *Insert into editor*. Point at the compliance finding
-   ("ambiguous deadline"). Click *Apply fix*. Show that the editor text
-   changed and the finding cleared.
+   including one ambiguous deadline."* Watch the brief write itself **live
+   into the editor**, block by block (no Insert step). Point at the compliance
+   finding ("ambiguous deadline"). Click *Apply fix*. Show that the editor
+   text changed and the finding cleared.
 3. **UC2 — Deliverable description.** Add a deliverable in the deliverables
    table. Open it. Click the AI icon next to the description editor. Ask
    *"Draft the description, focusing on acceptance criteria."* Show the
@@ -206,6 +207,7 @@ the assistant decides from what you asked.
 | (TBC) | Should AI sessions persist in the Outerscore backend? | No for the demo. Separate ticket. |
 | (TBC) | Where does the iframe keep the Outerscore access token? | **In memory only.** The parent re-sends it on every iframe boot and on token refresh, so the iframe never needs sessionStorage/localStorage. Cuts the XSS exfiltration window to "live tab, script already running" and applies to the demo as well as production. Long-term goal is to drop bearer-in-JS entirely once the same-origin reverse-proxy deploy lands (first-party `HttpOnly` cookie). |
 | (TBC) | Is canvas mode always on when next to an editor? | **No — intent-driven.** The assistant replies as a normal chat unless the user asks it to write/update the document, in which case it wraps output in a `<document>` marker that the host streams into the canvas. Detected from the request, no user toggle. |
+| (TBC) | Keep the "Insert into editor" confirmation step? | **No — removed.** AI content is written live, block by block, directly into the editor as it streams. Revert via Stop (mid-stream) or Ctrl+Z (after). Decided with PO. |
 
 ---
 

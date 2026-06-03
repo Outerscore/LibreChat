@@ -13,12 +13,13 @@ Outerscore Buyer (Angular, port 4200)
 ├── JobAddGeneralComponent                   (main-app, Step 1 launcher chip)
 │
 ├── AiAssistantPanelService                  (lib — signals: isOpen, context,
-│                                             streamAccumulated, activeBriefContent;
-│                                             insertRequested$ Subject)
+│                                             streaming, streamAccumulated,
+│                                             findings; applyFixRequested$;
+│                                             requestStop())
 │
 ├── LibrechatSidePanelComponent              (main-app — mounted at app-root,
-│                                             left-docked panel, marked preview,
-│                                             "Insert into editor" button)
+│                                             left-docked panel, "AI is writing…"
+│                                             status + Stop, findings list)
 │       │
 │       └── LibrechatIframeComponent         (main-app — owns the iframe,
 │                                             postMessage bridge, strict-origin
@@ -109,7 +110,25 @@ Source of truth: `CANVAS_PAGES` sets in `client/src/hooks/Messages/useSubmitMess
   - `'yes'` → stream **only the document body** (`extractDocBody`) into the canvas, parse the trailing `<compliance>` envelope, then replace the chat bubble with the "✍️ Content written to canvas." placeholder.
   - `'no'` / unresolved `'pending'` → do nothing canvas-related; the reply stays in the chat thread as an ordinary message.
 
-Net effect: ask "what's a fair day rate?" on the Project Brief page and you get a normal chat answer; ask "draft the brief" and the document streams into the canvas. Nothing reaches EditorJS until the user clicks **Insert into editor** regardless.
+Net effect: ask "what's a fair day rate?" on the Project Brief page and you get a normal chat answer; ask "draft the brief" and the document streams **live into the editor** (see next section).
+
+---
+
+## Live streaming into EditorJS (no "Insert" step)
+
+EditorJS is block-JSON, not an HTML sink — you cannot pipe HTML/markdown into it. So "live writing" is done at **block granularity**, not character-by-character.
+
+`BlockStyleEditorComponent` exposes three methods (additive, alongside `appendBlocks`):
+
+- `beginStream(replace = true)` — canvas mode passes `replace`: seeds the reconciliation cursor with the editor's current block ids (so the existing doc morphs into the new one in place — no clear/flash). `replace = false` appends after existing content.
+- `streamBlocks(blocks)` — reconciles the streamed region to the given block list: updates the in-progress tail block via `editor.blocks.update(id, data)`, inserts newly completed blocks, deletes any that reflowed away. Runs outside Angular's zone; cheap no-op when a block's serialized data is unchanged.
+- `endStream()` — flushes `onChangeHandler()` once so the new content persists into the value model + history, and clears the cursor.
+
+Driver: the drawers (`BlockStyleEditorDrawerComponent`, `DeliverableDrawerComponent`) hold an `effect()` on `AiAssistantPanelService.streaming` + `streamAccumulated`. On the rising edge → `beginStream`; per chunk → markdown→html→`getBlocks`→`streamBlocks` (throttled ~80ms); on the falling edge → final flush + `endStream`. The side panel only shows an "AI is writing…" status + **Stop** (`requestStop()` flips `streaming` off; further chunks are ignored, content frozen; revert via editor undo).
+
+Feedback-loop guard: during streaming the editor's `onChange` does not fire (streamBlocks runs outside the zone), so the live `outerscore:canvas-context` push-back happens only once at `endStream` with the final document — the AI never re-ingests its own half-written output.
+
+EditorJS version: **2.30.8** (full `blocks.update/insert/delete` API).
 
 ---
 
