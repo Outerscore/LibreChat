@@ -48,14 +48,15 @@ try {
         window.dispatchEvent(new CustomEvent('outerscore:token-ready'));
       }
       if (data.type === 'outerscore:theme' && data.vars && typeof data.vars === 'object') {
-        // The host owns the live palette; mirror its --color-* values as inline
+        // The host owns the live palette; mirror its --os-* values as inline
         // CSS variables so the embedded chat matches the running app (and any
-        // runtime theme switch). Inline :root vars override outerscore-tokens.css.
+        // runtime cosmic/classic theme switch). Inline :root vars override
+        // outerscore-tokens.css.
         const root = document.documentElement;
         Object.entries(data.vars).forEach(([name, value]) => {
           if (
             typeof name === 'string' &&
-            name.startsWith('--color-') &&
+            name.startsWith('--os-color-') &&
             typeof value === 'string' &&
             value
           ) {

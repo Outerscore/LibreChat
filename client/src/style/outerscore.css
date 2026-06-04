@@ -2,52 +2,53 @@
  * Outerscore design-system alignment for the LibreChat fork.
  *
  * Remaps LibreChat's own semantic CSS variables onto the Outerscore palette
- * (`--color-*`, defined in outerscore-tokens.css as a fallback and overridden
- * live by the host via the `outerscore:theme` postMessage). Colours come
- * exclusively from `--color-*` — no hardcoded hex here.
+ * (`--os-color-*`, defined in outerscore-tokens.css as a fallback and overridden
+ * live by the host via the `outerscore:theme` postMessage — including runtime
+ * cosmic/classic switches). Colours come exclusively from `--os-color-*` — no
+ * hardcoded hex here.
  *
  * We keep LibreChat's layout and components — this is a re-skin, not a redesign.
  */
 
 :root {
   /* ---- Brand / submit ---- */
-  --brand-purple: var(--color-brand-600);
-  --surface-submit: var(--color-brand-600);
-  --surface-submit-hover: var(--color-brand-700);
+  --brand-purple: var(--os-color-brand-600);
+  --surface-submit: var(--os-color-brand-600);
+  --surface-submit-hover: var(--os-color-brand-700);
 
   /* ---- Text ---- */
-  --text-primary: var(--color-gray-900);
-  --text-secondary: var(--color-gray-700);
-  --text-secondary-alt: var(--color-gray-700);
-  --text-tertiary: var(--color-gray-500);
-  --text-warning: var(--color-warning-600);
+  --text-primary: var(--os-color-gray-900);
+  --text-secondary: var(--os-color-gray-700);
+  --text-secondary-alt: var(--os-color-gray-700);
+  --text-tertiary: var(--os-color-gray-500);
+  --text-warning: var(--os-color-warning-600);
 
   /* ---- Surfaces ---- */
-  --surface-primary: var(--color-white);
-  --surface-primary-alt: var(--color-gray-50);
-  --surface-secondary: var(--color-gray-50);
-  --surface-secondary-alt: var(--color-gray-100);
-  --surface-tertiary: var(--color-gray-100);
-  --surface-chat: var(--color-white);
-  --surface-active: var(--color-gray-100);
-  --surface-active-alt: var(--color-gray-200);
-  --surface-hover: var(--color-gray-100);
-  --surface-hover-alt: var(--color-gray-200);
+  --surface-primary: var(--os-color-white);
+  --surface-primary-alt: var(--os-color-gray-50);
+  --surface-secondary: var(--os-color-gray-50);
+  --surface-secondary-alt: var(--os-color-gray-100);
+  --surface-tertiary: var(--os-color-gray-100);
+  --surface-chat: var(--os-color-white);
+  --surface-active: var(--os-color-gray-100);
+  --surface-active-alt: var(--os-color-gray-200);
+  --surface-hover: var(--os-color-gray-100);
+  --surface-hover-alt: var(--os-color-gray-200);
 
   /* ---- Header ---- */
-  --header-primary: var(--color-white);
-  --header-hover: var(--color-gray-50);
-  --header-button-hover: var(--color-gray-100);
+  --header-primary: var(--os-color-white);
+  --header-hover: var(--os-color-gray-50);
+  --header-button-hover: var(--os-color-gray-100);
 
   /* ---- Borders ---- */
-  --border-light: var(--color-gray-200);
-  --border-medium: var(--color-gray-300);
-  --border-medium-alt: var(--color-gray-300);
-  --border-heavy: var(--color-gray-400);
-  --border-xheavy: var(--color-gray-500);
+  --border-light: var(--os-color-gray-200);
+  --border-medium: var(--os-color-gray-300);
+  --border-medium-alt: var(--os-color-gray-300);
+  --border-heavy: var(--os-color-gray-400);
+  --border-xheavy: var(--os-color-gray-500);
 
   /* ---- Focus ring ---- */
-  --ring-primary: var(--color-brand-500);
+  --ring-primary: var(--os-color-brand-500);
 }
 
 /* Typography — align to the Outerscore app font (Roboto). */
