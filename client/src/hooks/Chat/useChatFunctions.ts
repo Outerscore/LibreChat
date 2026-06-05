@@ -29,6 +29,7 @@ import type { TAskFunction, ExtendedFile } from '~/common';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 import useGetSender from '~/hooks/Conversations/useGetSender';
 import { logger, createDualMessageContent } from '~/utils';
+import { buildCanvasSystemPrompt } from '~/utils/canvas';
 import store, { useGetEphemeralAgent } from '~/store';
 import { startupConfigKey } from '~/data-provider';
 import useUserKey from '~/hooks/Input/useUserKey';
@@ -133,6 +134,17 @@ export default function useChatFunctions({
         text: conversation.promptPrefix,
         user,
       });
+    }
+
+    // Inject the Outerscore editor/page context as invisible system
+    // instructions so the document + canvas rules reach the model without ever
+    // appearing in the visible user message. Mutates the cloned conversation
+    // only (this turn's payload) — never persisted.
+    const canvasSystemPrompt = buildCanvasSystemPrompt();
+    if (canvasSystemPrompt && conversation) {
+      conversation.promptPrefix = conversation.promptPrefix
+        ? `${conversation.promptPrefix}\n\n${canvasSystemPrompt}`
+        : canvasSystemPrompt;
     }
 
     // construct the query message
