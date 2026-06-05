@@ -58,12 +58,21 @@ const detectCanvasIntent = (text: string): CanvasIntent => {
 /** Extract the document body (between the tags) from a document-mode reply. */
 const extractDocBody = (text: string): string => {
   const t = text.replace(/^\s+/, '');
-  let body = t.startsWith(DOC_OPEN) ? t.slice(DOC_OPEN.length) : t;
+  // Find the <document> open tag anywhere (tolerate a preamble); fall back to
+  // the whole reply when there is no envelope — e.g. weaker models, or 'always'
+  // routing where the host already decided the reply targets the document.
+  const openIdx = t.indexOf(DOC_OPEN);
+  let body = openIdx !== -1 ? t.slice(openIdx + DOC_OPEN.length) : t;
   const closeIdx = body.indexOf(DOC_CLOSE);
   if (closeIdx !== -1) {
     body = body.slice(0, closeIdx);
   }
-  return body;
+  // Strip the compliance envelope (parsed separately); never show it in the doc.
+  const compIdx = body.indexOf('<compliance>');
+  if (compIdx !== -1) {
+    body = body.slice(0, compIdx);
+  }
+  return body.trim();
 };
 
 const SEVERITIES: Set<string> = new Set(['HIGH', 'MODERATE', 'LOW']);
@@ -215,6 +224,16 @@ export default function useSSE(
     let canvasIntent: CanvasIntent = 'pending';
     const isInIframe = typeof window !== 'undefined' && window.parent !== window;
     const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
+    // Routing mode — the model-independence lever:
+    //  'intent' (default): the model decides per reply by emitting <document>.
+    //    Best for instruction-following models (Claude); keeps in-chat Q&A.
+    //  'always': every reply on a canvas page IS the document — no envelope
+    //    required, no model decision. Works on ANY model, incl. local/Ollama.
+    //  Set VITE_OUTERSCORE_CANVAS_ROUTING=always to enable.
+    const CANVAS_ROUTING: 'intent' | 'always' =
+      ((import.meta.env.VITE_OUTERSCORE_CANVAS_ROUTING as string) || 'intent') === 'always'
+        ? 'always'
+        : 'intent';
     let isCanvasPage = false;
     try {
       isCanvasPage = CANVAS_PAGES.has(sessionStorage.getItem('outerscore:page') ?? '');
@@ -294,10 +313,14 @@ export default function useSSE(
         return;
       }
       rawText = currentText;
-      if (canvasIntent === 'no') {
+      // 'always' routing: the host already decided this turn targets the
+      // document, so route every reply to the canvas — no <document> envelope
+      // required (works on any model). 'intent': the model decides via the tag.
+      if (CANVAS_ROUTING === 'always') {
+        canvasIntent = 'yes';
+      } else if (canvasIntent === 'no') {
         return;
-      }
-      if (canvasIntent === 'pending') {
+      } else if (canvasIntent === 'pending') {
         canvasIntent = detectCanvasIntent(currentText);
         // Still ambiguous, or confirmed a plain chat reply → don't touch canvas.
         if (canvasIntent !== 'yes') {
@@ -337,7 +360,9 @@ export default function useSSE(
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
         forwardCanvasStream();
         if (canvasCapable) {
-          if (canvasIntent === 'pending') {
+          if (CANVAS_ROUTING === 'always') {
+            canvasIntent = 'yes';
+          } else if (canvasIntent === 'pending') {
             canvasIntent = detectCanvasIntent(rawText);
           }
           // Only a document reply drives the canvas; a normal chat reply is
@@ -345,10 +370,14 @@ export default function useSSE(
           if (canvasIntent === 'yes') {
             const { findings } = parseComplianceEnvelope(rawText);
             const body = extractDocBody(rawText);
-            postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
-            postToCanvas({ type: 'outerscore:compliance-result', findings });
-            replaceLastAssistantWithPlaceholder();
-            postToCanvas({ type: 'outerscore:canvas-complete' });
+            // Never clobber the editor with an empty body — weak models can
+            // return nothing usable; leave the chat reply in place instead.
+            if (body.length > 0) {
+              postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
+              postToCanvas({ type: 'outerscore:compliance-result', findings });
+              replaceLastAssistantWithPlaceholder();
+              postToCanvas({ type: 'outerscore:canvas-complete' });
+            }
           }
         }
         console.log('final', data);

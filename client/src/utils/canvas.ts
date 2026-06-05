@@ -36,14 +36,32 @@ const complianceClause = (rules: string[]): string =>
  * Returned as *system* instructions so the document + rules never appear in the
  * visible user message.
  */
-const buildSpecPrompt = (spec: CanvasSpec, document: string): string => {
+const buildSpecPrompt = (spec: CanvasSpec, document: string, alwaysDocument: boolean): string => {
   const trimmed = document.trim();
-  return [
+  const context = [
     `You are an assistant embedded next to a ${spec.artifact} editor on the Outerscore procurement platform.`,
     trimmed
       ? `The current ${spec.artifact} content is:\n---\n${trimmed}\n---`
       : `The ${spec.artifact} is currently empty.`,
     '',
+  ];
+
+  // 'always' routing: the host has already decided this turn targets the
+  // document, so don't ask the model to choose — just have it write the doc.
+  // No <document> envelope is required, which is what lets weaker / local
+  // models (Ollama) drive the canvas reliably.
+  if (alwaysDocument) {
+    return [
+      ...context,
+      `Treat the user's message as an instruction to create or revise the ${spec.artifact}. Reply with the COMPLETE updated ${spec.artifact} in Markdown — no preamble, no commentary, no code fences.`,
+      spec.structure,
+      complianceClause(spec.rules),
+    ].join('\n');
+  }
+
+  // 'intent' routing: the model decides per reply via the <document> envelope.
+  return [
+    ...context,
     "Decide how to respond based on the user's message:",
     '',
     `1. If the user asks you to WRITE, DRAFT, REWRITE, UPDATE, TRANSLATE, SHORTEN, EXPAND or otherwise change the ${spec.artifact}, reply with the COMPLETE updated document and nothing before it. Begin your reply with the <document> tag:`,
@@ -112,6 +130,8 @@ export const buildCanvasSystemPrompt = (): string => {
   if (!CANVAS_PAGES.has(page)) {
     return '';
   }
+  const alwaysDocument =
+    ((import.meta.env.VITE_OUTERSCORE_CANVAS_ROUTING as string) || 'intent') === 'always';
   const spec = SPEC_BY_PAGE[page] ?? GENERIC_SPEC;
-  return buildSpecPrompt(spec, canvas);
+  return buildSpecPrompt(spec, canvas, alwaysDocument);
 };
