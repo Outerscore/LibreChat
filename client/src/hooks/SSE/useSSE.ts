@@ -243,18 +243,10 @@ export default function useSSE(
     // Page must be canvas-capable; whether a given turn actually drives the
     // canvas is decided per-reply by canvasIntent (the <document> marker).
     const canvasCapable = isInIframe && isCanvasPage;
-    if (isInIframe) {
-      console.debug('[os-ai] fork canvas gate', {
-        isCanvasPage,
-        routing: CANVAS_ROUTING,
-        capable: canvasCapable,
-      });
-    }
     const postToCanvas = (message: CanvasStreamMessage) => {
       if (!canvasCapable) {
         return;
       }
-      console.debug('[os-ai] fork → parent', message.type);
       window.parent.postMessage(message, '*');
     };
     const replaceLastAssistantWithPlaceholder = () => {
