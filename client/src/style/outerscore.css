@@ -4,8 +4,9 @@
  * Remaps LibreChat's own semantic CSS variables onto the Outerscore palette
  * (`--os-color-*`, defined in outerscore-tokens.css as a fallback and overridden
  * live by the host via the `outerscore:theme` postMessage — including runtime
- * cosmic/classic switches). Colours come exclusively from `--os-color-*` — no
- * hardcoded hex here.
+ * cosmic/classic switches). Colours come from `--os-color-*` — the one exception
+ * is the Tailwind theme accents (`--primary` / `--destructive`), which Tailwind
+ * consumes as `hsl(var(--x))` and so must be HSL triplets (see the block below).
  *
  * We keep LibreChat's layout and components — this is a re-skin, not a redesign.
  */
@@ -16,10 +17,10 @@
   --surface-submit: var(--os-color-brand-600);
   --surface-submit-hover: var(--os-color-brand-700);
 
-  /* ---- Text ---- */
-  --text-primary: var(--os-color-gray-900);
-  --text-secondary: var(--os-color-gray-700);
-  --text-secondary-alt: var(--os-color-gray-700);
+  /* ---- Text ---- (the host's real text tokens — gray-900 was too dark) */
+  --text-primary: var(--os-text-primary);
+  --text-secondary: var(--os-text-secondary);
+  --text-secondary-alt: var(--os-text-secondary);
   --text-tertiary: var(--os-color-gray-500);
   --text-warning: var(--os-color-warning-600);
 
@@ -49,11 +50,37 @@
 
   /* ---- Focus ring ---- */
   --ring-primary: var(--os-color-brand-500);
+
+  /* ---- Destructive (delete / danger) → Outerscore error ---- */
+  --surface-destructive: var(--os-color-error-600);
+  --surface-destructive-hover: var(--os-color-error-700);
+  --text-destructive: var(--os-color-error-600);
+  --border-destructive: var(--os-color-error-600);
+
+  /* ---- Tailwind theme accents ----
+     Consumed as `hsl(var(--x))`, so these MUST be space-separated HSL triplets
+     (not the --os-color-* hex tokens) to keep Tailwind's `/opacity` modifiers
+     working (bg-primary/90, bg-destructive/10, …). Drives toggles, checkboxes,
+     the default Button, and destructive items. Values mirror the Cosmic brand-500
+     (#5f36f5) and error-600 (#e7000b); they don't track a runtime cosmic→classic
+     switch — revisit with host-pushed HSL tokens if classic-accent fidelity matters. */
+  --primary: 253 91% 59%;
+  --primary-foreground: 0 0% 100%;
+  --destructive: 357 100% 45%;
+  --destructive-foreground: 0 0% 100%;
 }
 
 /* Typography — align to the Outerscore app font (Roboto). */
 body {
   font-family: 'Roboto', 'Helvetica Neue', sans-serif;
+}
+
+/* Primary chat send button: the fork hardcodes `bg-text-primary` (near-black) for
+   its fill, so it never picked up the brand. Re-point it to brand-500; the id
+   selector beats the Tailwind utility. `disabled:opacity-10` still dims it. */
+#send-button {
+  background-color: var(--os-color-brand-500);
+  color: var(--os-color-white);
 }
 
 /* Embedded only: the chat footer is hidden in the iframe, so the composer's

@@ -60,7 +60,7 @@ try {
         Object.entries(data.vars).forEach(([name, value]) => {
           if (
             typeof name === 'string' &&
-            name.startsWith('--os-color-') &&
+            (name.startsWith('--os-color-') || name.startsWith('--os-text-')) &&
             typeof value === 'string' &&
             value
           ) {

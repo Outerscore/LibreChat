@@ -48,6 +48,7 @@
   --os-color-error-50: #fef2f2;
   --os-color-error-500: #fb2c36;
   --os-color-error-600: #e7000b;
+  --os-color-error-700: #c10007;
 
   /* Warning — Amber */
   --os-color-warning-50: #fffbeb;
@@ -58,4 +59,9 @@
   --os-color-success-50: #f0fdf4;
   --os-color-success-500: #22c55e;
   --os-color-success-600: #16a34a;
+
+  /* Semantic text — mirrors the host's --os-text-* (pushed live via outerscore:theme).
+     Used by outerscore.css so embedded text matches the app instead of pure black. */
+  --os-text-primary: rgba(0, 0, 0, 0.87);
+  --os-text-secondary: var(--os-color-gray-700);
 }
