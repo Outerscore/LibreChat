@@ -145,13 +145,14 @@ export default function useResumableSSE(
       let canvasAccumulated = '';
       let canvasStreamStarted = false;
       const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-      let isCanvas2 = false;
+      const canvasPages = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
+      let isCanvasPage = false;
       try {
-        isCanvas2 = sessionStorage.getItem('outerscore:page') === 'canvas2';
+        isCanvasPage = canvasPages.has(sessionStorage.getItem('outerscore:page') ?? '');
       } catch {
         /* ignore */
       }
-      const shouldPostToCanvas = isInIframe && isCanvas2;
+      const shouldPostToCanvas = isInIframe && isCanvasPage;
       const postToCanvas = (message: Record<string, unknown>) => {
         if (!shouldPostToCanvas) return;
         window.parent.postMessage(message, '*');
