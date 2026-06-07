@@ -32,6 +32,10 @@ try {
       /* ignore */
     }
     document.documentElement.classList.remove('dark');
+    // Marks the embedded context for re-skin CSS that should only apply in the
+    // host iframe (e.g. tightening the composer's bottom margin now the footer is
+    // hidden). Scopes those rules without touching standalone LibreChat.
+    document.documentElement.classList.add('os-embedded');
 
     const parentOrigin = import.meta.env.VITE_OUTERSCORE_PARENT_ORIGIN || '';
 
