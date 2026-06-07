@@ -73,18 +73,39 @@ module.exports = {
           850: '#171717',
           900: '#0d0d0d',
         },
+        // Re-skinned to the Outerscore success ramp (standard green; 500 #22c55e /
+        // 600 #16a34a match the host's --os-color-success-*). Replaces LibreChat's
+        // teal brand-green so every hardcoded `*-green-*` literal renders in the
+        // Outerscore palette. Plain hex (not var()) keeps `/opacity` modifiers working.
         green: {
-          50: '#f1f9f7',
-          100: '#def2ed',
-          200: '#a6e5d6',
-          300: '#6dc8b9',
-          400: '#41a79d',
-          500: '#10a37f',
-          550: '#349072',
-          600: '#126e6b',
-          700: '#0a4f53',
-          800: '#06373e',
-          900: '#031f29',
+          50: '#f0fdf4',
+          100: '#dcfce7',
+          200: '#bbf7d0',
+          300: '#86efac',
+          400: '#4ade80',
+          500: '#22c55e',
+          550: '#1aa64b',
+          600: '#16a34a',
+          700: '#15803d',
+          800: '#166534',
+          900: '#14532d',
+          950: '#052e16',
+        },
+        // Outerscore error ramp (= Tailwind v4 red; 50 #fef2f2 / 500 #fb2c36 /
+        // 600 #e7000b / 700 #c10007 match --os-color-error-*). LibreChat left `red`
+        // at the v3 default; align it so hardcoded `*-red-*` danger states match.
+        red: {
+          50: '#fef2f2',
+          100: '#ffe2e2',
+          200: '#ffc9c9',
+          300: '#ffa2a2',
+          400: '#ff6467',
+          500: '#fb2c36',
+          600: '#e7000b',
+          700: '#c10007',
+          800: '#9f0712',
+          900: '#82181a',
+          950: '#460809',
         },
         'brand-purple': 'var(--brand-purple)',
         presentation: 'var(--presentation)',
