@@ -90,3 +90,17 @@ body {
 .os-embedded form.mx-auto.flex-row {
   margin-bottom: 0.5rem;
 }
+
+/* Smallest view (compact window, below Tailwind's `sm`/640px breakpoint — where
+   the composer is square-bottomed `rounded-t-3xl` with no `sm:` margin): round the
+   bottom corners to match the 12px window frame and sit flush at the bottom. */
+@media (max-width: 639.98px) {
+  .os-embedded form.mx-auto.flex-row {
+    margin-bottom: 0;
+  }
+
+  .os-embedded .rounded-t-3xl {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+  }
+}
