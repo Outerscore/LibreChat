@@ -7,143 +7,21 @@ import { request, createPayload, removeNullishValues, QueryKeys } from 'librecha
 import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
+import type { CanvasIntent, CanvasStreamMessage } from '~/utils/canvas';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
+import {
+  detectCanvasIntent,
+  extractDocBody,
+  extractMessageText,
+  isOnCanvasPage,
+  parseComplianceEnvelope,
+  isCanvasRoutingAlways,
+  CANVAS_PLACEHOLDER_TEXT,
+} from '~/utils/canvas';
 import store from '~/store';
-
-type ComplianceSeverity = 'HIGH' | 'MODERATE' | 'LOW';
-
-interface ComplianceFinding {
-  text: string;
-  severity: ComplianceSeverity;
-  reason: string;
-  suggestion?: string;
-}
-
-const SUGGESTION_MAX_LEN = 600;
-
-type CanvasStreamMessage =
-  | { type: 'outerscore:stream-start' }
-  | { type: 'outerscore:stream-chunk'; chunk: string; accumulated: string }
-  | { type: 'outerscore:stream-end'; accumulated: string }
-  | { type: 'outerscore:canvas-complete' }
-  | { type: 'outerscore:compliance-result'; findings: ComplianceFinding[] };
-
-const CANVAS_PLACEHOLDER_TEXT = '✍️ Content written to canvas.';
-const COMPLIANCE_ENVELOPE = /<compliance>([\s\S]*?)<\/compliance>/;
-const DOC_OPEN = '<document>';
-const DOC_CLOSE = '</document>';
-
-/**
- * Per-turn canvas intent. A reply is treated as document work only when it
- * begins with `<document>`; anything else is a normal chat reply and is left
- * untouched in the chat thread. Returns 'pending' while the streamed prefix is
- * still a possible start of the opening tag.
- */
-type CanvasIntent = 'pending' | 'yes' | 'no';
-
-const detectCanvasIntent = (text: string): CanvasIntent => {
-  const t = text.replace(/^\s+/, '');
-  if (t.length === 0) {
-    return 'pending';
-  }
-  if (t.startsWith(DOC_OPEN)) {
-    return 'yes';
-  }
-  return DOC_OPEN.startsWith(t) ? 'pending' : 'no';
-};
-
-/** Extract the document body (between the tags) from a document-mode reply. */
-const extractDocBody = (text: string): string => {
-  const t = text.replace(/^\s+/, '');
-  // Find the <document> open tag anywhere (tolerate a preamble); fall back to
-  // the whole reply when there is no envelope — e.g. weaker models, or 'always'
-  // routing where the host already decided the reply targets the document.
-  const openIdx = t.indexOf(DOC_OPEN);
-  let body = openIdx !== -1 ? t.slice(openIdx + DOC_OPEN.length) : t;
-  const closeIdx = body.indexOf(DOC_CLOSE);
-  if (closeIdx !== -1) {
-    body = body.slice(0, closeIdx);
-  }
-  // Strip the compliance envelope (parsed separately); never show it in the doc.
-  const compIdx = body.indexOf('<compliance>');
-  if (compIdx !== -1) {
-    body = body.slice(0, compIdx);
-  }
-  return body.trim();
-};
-
-const SEVERITIES: Set<string> = new Set(['HIGH', 'MODERATE', 'LOW']);
-
-const parseComplianceEnvelope = (text: string): {
-  findings: ComplianceFinding[];
-  stripped: string;
-} => {
-  const match = text.match(COMPLIANCE_ENVELOPE);
-  if (!match) {
-    return { findings: [], stripped: text };
-  }
-  let findings: ComplianceFinding[] = [];
-  try {
-    const parsed = JSON.parse(match[1]);
-    if (Array.isArray(parsed?.findings)) {
-      findings = parsed.findings.reduce<ComplianceFinding[]>((acc, item) => {
-        if (
-          item &&
-          typeof item.text === 'string' &&
-          typeof item.severity === 'string' &&
-          typeof item.reason === 'string' &&
-          SEVERITIES.has(item.severity.toUpperCase())
-        ) {
-          const finding: ComplianceFinding = {
-            text: item.text,
-            severity: item.severity.toUpperCase() as ComplianceSeverity,
-            reason: item.reason,
-          };
-          if (typeof item.suggestion === 'string' && item.suggestion.trim().length > 0) {
-            finding.suggestion = item.suggestion.slice(0, SUGGESTION_MAX_LEN);
-          }
-          acc.push(finding);
-        }
-        return acc;
-      }, []);
-    }
-  } catch {
-    /* malformed envelope — treat as no findings, keep original text */
-    return { findings: [], stripped: text };
-  }
-  const stripped = text.slice(0, match.index).concat(text.slice((match.index ?? 0) + match[0].length)).trim();
-  return { findings, stripped };
-};
-
-const extractMessageText = (message: TMessage | undefined | null): string => {
-  if (!message) {
-    return '';
-  }
-  if (typeof message.text === 'string' && message.text.length > 0) {
-    return message.text;
-  }
-  const content = message.content;
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (!part) {
-          return '';
-        }
-        if (typeof part === 'string') {
-          return part;
-        }
-        if ('text' in part && typeof part.text === 'string') {
-          return part.text;
-        }
-        return '';
-      })
-      .join('');
-  }
-  return typeof message.text === 'string' ? message.text : '';
-};
 
 type ChatHelpers = Pick<
   EventHandlerParams,
@@ -223,26 +101,13 @@ export default function useSSE(
     let canvasStreamStarted = false;
     let canvasIntent: CanvasIntent = 'pending';
     const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
-    // Routing mode — the model-independence lever:
-    //  'intent' (default): the model decides per reply by emitting <document>.
-    //    Best for instruction-following models (Claude); keeps in-chat Q&A.
-    //  'always': every reply on a canvas page IS the document — no envelope
-    //    required, no model decision. Works on ANY model, incl. local/Ollama.
-    //  Set VITE_OUTERSCORE_CANVAS_ROUTING=always to enable.
-    const CANVAS_ROUTING: 'intent' | 'always' =
-      ((import.meta.env.VITE_OUTERSCORE_CANVAS_ROUTING as string) || 'intent') === 'always'
-        ? 'always'
-        : 'intent';
-    let isCanvasPage = false;
-    try {
-      isCanvasPage = CANVAS_PAGES.has(sessionStorage.getItem('outerscore:page') ?? '');
-    } catch {
-      /* ignore */
-    }
     // Page must be canvas-capable; whether a given turn actually drives the
     // canvas is decided per-reply by canvasIntent (the <document> marker).
-    const canvasCapable = isInIframe && isCanvasPage;
+    const canvasCapable = isInIframe && isOnCanvasPage();
+    // Routing lever (see utils/canvas): 'always' forwards every canvas-page reply
+    // as the document (weak/local models); 'intent' (default, Claude) lets the
+    // model decide via the <document> envelope, which keeps in-chat Q&A working.
+    const alwaysDocument = isCanvasRoutingAlways();
     const postToCanvas = (message: CanvasStreamMessage) => {
       if (!canvasCapable) {
         return;
@@ -316,7 +181,7 @@ export default function useSSE(
       // 'always' routing: the host already decided this turn targets the
       // document, so route every reply to the canvas — no <document> envelope
       // required (works on any model). 'intent': the model decides via the tag.
-      if (CANVAS_ROUTING === 'always') {
+      if (alwaysDocument) {
         canvasIntent = 'yes';
       } else if (canvasIntent === 'no') {
         return;
@@ -360,7 +225,7 @@ export default function useSSE(
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
         forwardCanvasStream();
         if (canvasCapable) {
-          if (CANVAS_ROUTING === 'always') {
+          if (alwaysDocument) {
             canvasIntent = 'yes';
           } else if (canvasIntent === 'pending') {
             canvasIntent = detectCanvasIntent(rawText);

@@ -23,9 +23,19 @@ import {
   streamStatusQueryKey,
 } from '~/data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
+import type { CanvasIntent, CanvasStreamMessage } from '~/utils/canvas';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
+import {
+  detectCanvasIntent,
+  extractDocBody,
+  extractMessageText,
+  isOnCanvasPage,
+  parseComplianceEnvelope,
+  isCanvasRoutingAlways,
+  CANVAS_PLACEHOLDER_TEXT,
+} from '~/utils/canvas';
 import store from '~/store';
 
 type ChatHelpers = Pick<
@@ -142,38 +152,21 @@ export default function useResumableSSE(
     (currentStreamId: string, currentSubmission: TSubmission, isResume = false) => {
       let { userMessage } = currentSubmission;
       let textIndex: number | null = null;
-      let canvasAccumulated = '';
+      // Canvas streaming state — intent-aware, mirroring useSSE so this active
+      // (resumable) path drives the editor canvas with the same logic.
+      let rawText = '';
+      let sentDocBody = '';
       let canvasStreamStarted = false;
+      let canvasIntent: CanvasIntent = 'pending';
       const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-      const canvasPages = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
-      let isCanvasPage = false;
-      try {
-        isCanvasPage = canvasPages.has(sessionStorage.getItem('outerscore:page') ?? '');
-      } catch {
-        /* ignore */
-      }
-      const shouldPostToCanvas = isInIframe && isCanvasPage;
-      const postToCanvas = (message: Record<string, unknown>) => {
+      const shouldPostToCanvas = isInIframe && isOnCanvasPage();
+      // Routing lever (see utils/canvas): 'always' forwards every canvas-page reply
+      // as the document (weak/local models); 'intent' (default, Claude) lets the
+      // model decide via the <document> envelope, which keeps in-chat Q&A working.
+      const alwaysDocument = isCanvasRoutingAlways();
+      const postToCanvas = (message: CanvasStreamMessage) => {
         if (!shouldPostToCanvas) return;
         window.parent.postMessage(message, '*');
-      };
-      const extractMessageText = (message: TMessage | undefined | null): string => {
-        if (!message) return '';
-        if (typeof message.text === 'string' && message.text.length > 0) {
-          return message.text;
-        }
-        const content = message.content;
-        if (Array.isArray(content)) {
-          return content
-            .map((part) => {
-              if (!part) return '';
-              if (typeof part === 'string') return part;
-              if ('text' in part && typeof part.text === 'string') return part.text;
-              return '';
-            })
-            .join('');
-        }
-        return typeof message.text === 'string' ? message.text : '';
       };
       const forwardCanvasStream = () => {
         if (!shouldPostToCanvas) return;
@@ -181,18 +174,29 @@ export default function useResumableSSE(
         const last = msgs[msgs.length - 1];
         if (!last || last.isCreatedByUser) return;
         const currentText = extractMessageText(last);
-        if (!currentText || currentText.length <= canvasAccumulated.length) return;
+        if (!currentText) return;
+        rawText = currentText;
+        // 'always': the host already decided this turn targets the document.
+        // 'intent': decide per reply from the <document> marker; a plain chat
+        // reply (intent 'no') is left in the thread and never touches the canvas.
+        if (alwaysDocument) {
+          canvasIntent = 'yes';
+        } else if (canvasIntent === 'no') {
+          return;
+        } else if (canvasIntent === 'pending') {
+          canvasIntent = detectCanvasIntent(currentText);
+          if (canvasIntent !== 'yes') return;
+        }
+        // Document reply: stream only the body inside <document>…</document>.
+        const body = extractDocBody(currentText);
+        if (body.length <= sentDocBody.length) return;
         if (!canvasStreamStarted) {
           canvasStreamStarted = true;
           postToCanvas({ type: 'outerscore:stream-start' });
         }
-        const chunk = currentText.slice(canvasAccumulated.length);
-        canvasAccumulated = currentText;
-        postToCanvas({
-          type: 'outerscore:stream-chunk',
-          chunk,
-          accumulated: canvasAccumulated,
-        });
+        const chunk = body.slice(sentDocBody.length);
+        sentDocBody = body;
+        postToCanvas({ type: 'outerscore:stream-chunk', chunk, accumulated: body });
       };
       const replaceLastAssistantWithCanvasPlaceholder = () => {
         const msgs = getMessages() ?? [];
@@ -202,7 +206,7 @@ export default function useResumableSSE(
         if (last.isCreatedByUser) return;
         const replaced: TMessage = {
           ...last,
-          text: '✍️ Content written to canvas.',
+          text: CANVAS_PLACEHOLDER_TEXT,
           content: undefined,
         };
         setMessages([...msgs.slice(0, lastIdx), replaced]);
@@ -214,7 +218,7 @@ export default function useResumableSSE(
             if (prevLast.isCreatedByUser) return prev;
             return [
               ...prev.slice(0, prev.length - 1),
-              { ...prevLast, text: '✍️ Content written to canvas.', content: undefined },
+              { ...prevLast, text: CANVAS_PLACEHOLDER_TEXT, content: undefined },
             ];
           });
         }
@@ -264,9 +268,24 @@ export default function useResumableSSE(
             (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
             forwardCanvasStream();
             if (shouldPostToCanvas) {
-              postToCanvas({ type: 'outerscore:stream-end', accumulated: canvasAccumulated });
-              replaceLastAssistantWithCanvasPlaceholder();
-              postToCanvas({ type: 'outerscore:canvas-complete' });
+              if (alwaysDocument) {
+                canvasIntent = 'yes';
+              } else if (canvasIntent === 'pending') {
+                canvasIntent = detectCanvasIntent(rawText);
+              }
+              // Only a document reply drives the canvas; a normal chat reply is
+              // left in the thread untouched (no stream-end, no placeholder).
+              if (canvasIntent === 'yes') {
+                const { findings } = parseComplianceEnvelope(rawText);
+                const body = extractDocBody(rawText);
+                // Never clobber the editor with an empty body (weak/aborted replies).
+                if (body.length > 0) {
+                  postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
+                  postToCanvas({ type: 'outerscore:compliance-result', findings });
+                  replaceLastAssistantWithCanvasPlaceholder();
+                  postToCanvas({ type: 'outerscore:canvas-complete' });
+                }
+              }
             }
             sse.close();
             setStreamId(null);
