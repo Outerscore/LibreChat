@@ -1,16 +1,10 @@
 import type { TMessageContentParts } from 'librechat-data-provider';
+import { isOnCanvasPage } from '~/utils/canvas';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 
-const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
-
-export const isCanvas2Mode = (): boolean => {
-  try {
-    return CANVAS_PAGES.has(sessionStorage.getItem('outerscore:page') ?? '');
-  } catch {
-    return false;
-  }
-};
+/** Alias of {@link isOnCanvasPage}; the canvas-page allow-list lives in utils/canvas. */
+export const isCanvas2Mode = (): boolean => isOnCanvasPage();
 
 const extractPartsText = (content?: Array<TMessageContentParts | undefined>): string => {
   if (!Array.isArray(content)) {
