@@ -20,6 +20,7 @@ import {
   useNewConvo,
   useLocalize,
 } from '~/hooks';
+import useOuterscoreConversationBridge from '~/hooks/useOuterscoreConversationBridge';
 import { useGetConvoIdQuery, useGetStartupConfig, useGetEndpointsQuery } from '~/data-provider';
 import { ToolCallsMapProvider } from '~/Providers';
 import ChatView from '~/components/Chat/ChatView';
@@ -46,6 +47,7 @@ export default function ChatRoute() {
   const [searchParams] = useSearchParams();
   const { conversationId = '' } = useParams();
   useIdChangeEffect(conversationId);
+  useOuterscoreConversationBridge(conversationId);
   const { hasSetConversation, conversation } = store.useCreateConversationAtom(index);
   const { newConversation } = useNewConvo();
   const { showToast } = useToastContext();
