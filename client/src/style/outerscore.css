@@ -68,6 +68,12 @@
   --primary-foreground: 0 0% 100%;
   --destructive: 357 100% 45%;
   --destructive-foreground: 0 0% 100%;
+
+  /* ---- Component focus ring (slider / switch / radix `--ring`) ----
+     The fork's `--ring` is a near-black HSL triplet, so Radix focus rings
+     landed off-brand. Re-aim it at the brand-500 triplet (mirrors `--primary`)
+     so they match the OS focus ring. */
+  --ring: 253 91% 59%;
 }
 
 /* Typography — align to the Outerscore app font (Roboto). */
@@ -81,6 +87,37 @@ body {
 #send-button {
   background-color: var(--os-color-brand-500);
   color: var(--os-color-white);
+}
+
+/* Action buttons: `.btn-primary` / `.btn-secondary` hardcode a teal fill
+   (style.css ~1407–1461) that never tracked the brand. Re-point both to
+   brand-500 with brand-600 hover and a brand focus-visible ring. Global (not
+   `.os-embedded`-scoped) like `#send-button` — these classes only appear on
+   embedded surfaces. The class selectors match the utility specificity in
+   style.css and win on source order. */
+.btn-primary,
+.btn-secondary {
+  background-color: var(--os-color-brand-500);
+  color: var(--os-color-white);
+}
+.btn-primary:hover,
+.btn-secondary:hover {
+  --tw-text-opacity: 1;
+  border-color: transparent;
+  color: var(--os-color-white);
+  background-color: var(--os-color-brand-600);
+}
+.btn-primary.focus-visible,
+.btn-primary:focus-visible {
+  --tw-ring-color: var(--os-color-brand-500);
+}
+.btn-primary:disabled:hover {
+  background-color: var(--os-color-brand-500);
+}
+
+/* `.btn-neutral:hover` hardcodes #ececf1 — align to the gray-100 token. */
+.btn-neutral:hover {
+  background-color: var(--os-color-gray-100);
 }
 
 /* Embedded only: the chat footer is hidden in the iframe, so the composer's
