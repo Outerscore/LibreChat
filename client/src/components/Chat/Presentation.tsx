@@ -63,7 +63,7 @@ export default function Presentation({ children }: { children: React.ReactNode }
   return (
     <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
       <SidePanelGroup artifacts={artifactsElement}>
-        <main className="flex h-full flex-col overflow-y-auto" role="main">
+        <main className="os-chat-main flex h-full flex-col overflow-y-auto" role="main">
           {children}
         </main>
       </SidePanelGroup>

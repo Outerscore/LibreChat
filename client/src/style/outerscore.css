@@ -120,6 +120,25 @@ body {
   background-color: var(--os-color-gray-100);
 }
 
+/* Figma background gradients (embedded only). Stable hook classes — we do NOT
+   override the `bg-presentation` utility (shared by ~20 unrelated elements).
+   Header: opaque brand-25 → brand-50 bar with a gray-100 bottom border
+   (replaces the stock vertical fade). Main chat column: a soft brand-25 wash
+   that fades back to white top and bottom; the composer card stays white. */
+.os-embedded .os-chat-header {
+  background: linear-gradient(90deg, var(--os-color-brand-25), var(--os-color-brand-50));
+  border-bottom: 1px solid var(--os-color-gray-100);
+}
+.os-embedded .os-chat-main {
+  background: linear-gradient(
+    180deg,
+    #fff 0%,
+    var(--os-color-brand-25) 25%,
+    var(--os-color-brand-25) 75%,
+    #fff 100%
+  );
+}
+
 /* Embedded only: the chat footer is hidden in the iframe, so the composer's
    `sm:mb-10`/`sm:mb-28` bottom margin just leaves dead space at the bottom of
    the host window. Tighten it. Higher specificity beats the Tailwind utility;
