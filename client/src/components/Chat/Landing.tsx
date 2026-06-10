@@ -4,6 +4,7 @@ import { EModelEndpoint } from 'librechat-data-provider';
 import { BirthdayIcon, TooltipAnchor, SplitText } from '@librechat/client';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
+import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import ConvoIcon from '~/components/Endpoints/ConvoIcon';
 import { useLocalize, useAuthContext } from '~/hooks';
 import { getIconEndpoint, getEntity } from '~/utils';
@@ -136,6 +137,21 @@ export default function Landing({ centerFormOnLanding }: { centerFormOnLanding: 
     typeof startupConfig?.interface?.customWelcome === 'string'
       ? getGreeting()
       : getGreeting() + (user?.name ? ', ' + user.name : '');
+
+  if (isOuterscoreContext()) {
+    return (
+      <div
+        className={`flex h-full transform-gpu flex-col items-center justify-center pb-16 transition-all duration-200 ${centerFormOnLanding ? 'max-h-full sm:max-h-0' : 'max-h-full'}`}
+      >
+        <div className="os-landing-greeting flex flex-col items-center gap-2 p-2">
+          <span aria-hidden="true" className="text-2xl leading-none">
+            👋
+          </span>
+          <span className="font-medium">{localize('com_ui_os_greeting')}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

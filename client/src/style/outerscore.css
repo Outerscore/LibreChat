@@ -139,6 +139,36 @@ body {
   );
 }
 
+/* Landing greeting (embedded only): 👋 + "How can I help you?". */
+.os-embedded .os-landing-greeting {
+  color: var(--os-color-gray-950);
+  font-size: 16px;
+}
+
+/* Predefined prompt chips (embedded only): white pills per Figma — radius 12px,
+   subtle drop shadow, brand-500 Medium 14px text, lift on hover. */
+.os-embedded .os-starter-chip {
+  padding: 8px 16px;
+  border: 1px solid var(--os-color-gray-100);
+  border-radius: 12px;
+  background-color: var(--os-color-white);
+  box-shadow:
+    0 1px 2px rgba(15, 6, 48, 0.06),
+    0 1px 3px rgba(15, 6, 48, 0.08);
+  color: var(--os-color-brand-500);
+  font-size: 14px;
+  font-weight: 500;
+  transition:
+    transform 0.15s ease-in-out,
+    box-shadow 0.15s ease-in-out;
+}
+.os-embedded .os-starter-chip:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgba(15, 6, 48, 0.08),
+    0 4px 8px rgba(15, 6, 48, 0.1);
+}
+
 /* Embedded only: the chat footer is hidden in the iframe, so the composer's
    `sm:mb-10`/`sm:mb-28` bottom margin just leaves dead space at the bottom of
    the host window. Tighten it. Higher specificity beats the Tailwind utility;
