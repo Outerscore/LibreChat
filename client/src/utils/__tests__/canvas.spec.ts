@@ -3,9 +3,12 @@ import {
   detectCanvasIntent,
   extractDocBody,
   getCanvasMode,
+  isDocumentReplyText,
   parseComplianceEnvelope,
   resolveCanvasRouting,
   setCanvasMode,
+  shouldMaskCanvasReply,
+  CANVAS_PLACEHOLDER_TEXT,
 } from '../canvas';
 
 const PAGE_KEY = 'outerscore:page';
@@ -54,6 +57,44 @@ describe('canvas — user mode & routing', () => {
 
     it("falls back to the env lever ('intent' by default) in 'auto' mode", () => {
       expect(resolveCanvasRouting()).toBe('intent');
+    });
+  });
+
+  describe('isDocumentReplyText', () => {
+    it('flags the in-session canvas placeholder', () => {
+      expect(isDocumentReplyText(CANVAS_PLACEHOLDER_TEXT)).toBe(true);
+      expect(isDocumentReplyText(`  ${CANVAS_PLACEHOLDER_TEXT}  `)).toBe(true);
+    });
+
+    it('flags replies carrying a <document> tag or a compliance envelope', () => {
+      expect(isDocumentReplyText('Sure!\n<document>\nBody\n</document>')).toBe(true);
+      expect(
+        isDocumentReplyText('Body\n<compliance>{"findings":[]}</compliance>'),
+      ).toBe(true);
+    });
+
+    it('does not flag a plain chat reply or empty text', () => {
+      expect(isDocumentReplyText('A fair day rate depends on…')).toBe(false);
+      expect(isDocumentReplyText('')).toBe(false);
+    });
+  });
+
+  describe('shouldMaskCanvasReply', () => {
+    it("masks only doc-shaped replies in 'auto' (intent) mode", () => {
+      expect(shouldMaskCanvasReply('Plain Q&A answer')).toBe(false);
+      expect(shouldMaskCanvasReply('<document>Body</document>')).toBe(true);
+      expect(shouldMaskCanvasReply(CANVAS_PLACEHOLDER_TEXT)).toBe(true);
+    });
+
+    it("never masks a plain reply in 'chat' mode but keeps masking past document turns", () => {
+      setCanvasMode('chat');
+      expect(shouldMaskCanvasReply('Plain Q&A answer')).toBe(false);
+      expect(shouldMaskCanvasReply(CANVAS_PLACEHOLDER_TEXT)).toBe(true);
+    });
+
+    it("masks everything in 'document' (always) mode — doc replies carry no marker", () => {
+      setCanvasMode('document');
+      expect(shouldMaskCanvasReply('Untagged markdown that IS the document')).toBe(true);
     });
   });
 

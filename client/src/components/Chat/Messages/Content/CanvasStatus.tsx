@@ -1,12 +1,18 @@
 import type { TMessageContentParts } from 'librechat-data-provider';
-import { extractDocBody, isOnCanvasPage } from '~/utils/canvas';
+import {
+  extractDocBody,
+  isOnCanvasPage,
+  resolveCanvasRouting,
+  shouldMaskCanvasReply,
+  CANVAS_PLACEHOLDER_TEXT,
+} from '~/utils/canvas';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 
 /** Alias of {@link isOnCanvasPage}; the canvas-page allow-list lives in utils/canvas. */
 export const isCanvas2Mode = (): boolean => isOnCanvasPage();
 
-const extractPartsText = (content?: Array<TMessageContentParts | undefined>): string => {
+export const extractPartsText = (content?: Array<TMessageContentParts | undefined>): string => {
   if (!Array.isArray(content)) {
     return '';
   }
@@ -41,7 +47,16 @@ export const postCanvasContent = (
   if (typeof window === 'undefined' || window.parent === window) {
     return;
   }
-  const text = extractDocBody(extractPartsText(content));
+  // Chat mode never drives the editor, and only document work may be (re)posted:
+  // a Q&A reply or the bare in-session placeholder must not land as content.
+  if (resolveCanvasRouting() === 'chat') {
+    return;
+  }
+  const raw = extractPartsText(content);
+  if (raw.trim() === CANVAS_PLACEHOLDER_TEXT || !shouldMaskCanvasReply(raw)) {
+    return;
+  }
+  const text = extractDocBody(raw);
   if (!text) {
     return;
   }

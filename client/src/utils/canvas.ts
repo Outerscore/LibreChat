@@ -260,6 +260,37 @@ export const detectCanvasIntent = (text: string): CanvasIntent => {
   return text.includes(DOC_OPEN) ? 'yes' : 'pending';
 };
 
+/**
+ * True when an assistant reply's text is document work: the in-session canvas
+ * placeholder, an explicit `<document>` tag, or a `<compliance>` envelope
+ * (always-mode doc replies carry no `<document>` tag but do carry the envelope).
+ */
+export const isDocumentReplyText = (text: string): boolean => {
+  if (!text) {
+    return false;
+  }
+  const trimmed = text.trim();
+  return (
+    trimmed === CANVAS_PLACEHOLDER_TEXT ||
+    trimmed.includes(DOC_OPEN) ||
+    COMPLIANCE_ENVELOPE.test(trimmed)
+  );
+};
+
+/**
+ * Display decision for an assistant reply on a canvas page: mask it with the
+ * "written to canvas" indicator, or render it as a normal chat bubble.
+ * Under 'always' routing every reply is the document (and carries no marker),
+ * so everything is masked; under 'intent' and 'chat' only doc-shaped replies
+ * are — which is what lets Q&A and chat-mode replies render in the thread.
+ */
+export const shouldMaskCanvasReply = (text: string): boolean => {
+  if (resolveCanvasRouting() === 'always') {
+    return true;
+  }
+  return isDocumentReplyText(text);
+};
+
 /** Document body (between the tags) from a document-mode reply; envelope stripped. */
 export const extractDocBody = (text: string): string => {
   const t = text.replace(/^\s+/, '');

@@ -14,7 +14,9 @@ import {
   CanvasDoneIndicator,
   isCanvas2Mode,
   postCanvasContent,
+  extractPartsText,
 } from './CanvasStatus';
+import { shouldMaskCanvasReply } from '~/utils/canvas';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
 import ToolCallGroup from './ToolCallGroup';
@@ -183,9 +185,15 @@ const ContentParts = memo(function ContentParts({
     }
   }, [content, isCreatedByUser, edit, isLast, effectiveIsSubmitting]);
 
-  // Canvas2 mode: never render assistant content in the chat panel — show a status
-  // placeholder instead (the result lives in the canvas). Edit mode is exempt.
-  if (!isCreatedByUser && edit !== true && isCanvas2Mode()) {
+  // Canvas page: mask only replies that are document work (routing-aware) — a
+  // chat-mode or intent-routed Q&A reply renders as a normal bubble. Edit mode
+  // is exempt.
+  if (
+    !isCreatedByUser &&
+    edit !== true &&
+    isCanvas2Mode() &&
+    shouldMaskCanvasReply(extractPartsText(content))
+  ) {
     return effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
   }
 

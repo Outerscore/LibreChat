@@ -6,6 +6,7 @@ import type { TMessageContentProps, TDisplayProps } from '~/common';
 import Error from '~/components/Messages/Content/Error';
 import { useMessageContext } from '~/Providers';
 import { CanvasWritingIndicator, CanvasDoneIndicator, isCanvas2Mode } from './CanvasStatus';
+import { shouldMaskCanvasReply } from '~/utils/canvas';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
@@ -170,7 +171,10 @@ const MessageContent = ({
     return <EditMessage text={text} isSubmitting={isSubmitting} {...props} />;
   }
 
-  if (!message.isCreatedByUser && isCanvas2Mode()) {
+  // Canvas page: mask only replies that are document work (routing-aware) — a
+  // chat-mode or intent-routed Q&A reply renders as a normal bubble. A doc turn
+  // streaming under 'intent' flips to the indicator once its <document> tag lands.
+  if (!message.isCreatedByUser && isCanvas2Mode() && shouldMaskCanvasReply(text)) {
     const inFlight = isSubmitting || (isLast && regularContent.length === 0);
     return inFlight ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
   }
