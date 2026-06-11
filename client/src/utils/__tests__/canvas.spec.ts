@@ -17,9 +17,12 @@ describe('canvas — host-bound stream parsing', () => {
       expect(detectCanvasIntent('   \n<document>x')).toBe('yes');
     });
 
-    it("returns 'no' for a normal chat reply", () => {
-      expect(detectCanvasIntent('A fair day rate depends on…')).toBe('no');
-      expect(detectCanvasIntent('Here is some advice <document>')).toBe('no');
+    it("returns 'yes' when the tag arrives after a model preamble", () => {
+      expect(detectCanvasIntent('Here is the updated brief:\n<document>\nBody')).toBe('yes');
+    });
+
+    it("stays 'pending' for a tag-less reply (only the final pass decides chat-only)", () => {
+      expect(detectCanvasIntent('A fair day rate depends on…')).toBe('pending');
     });
   });
 

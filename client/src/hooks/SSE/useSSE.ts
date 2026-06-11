@@ -183,11 +183,10 @@ export default function useSSE(
       // required (works on any model). 'intent': the model decides via the tag.
       if (alwaysDocument) {
         canvasIntent = 'yes';
-      } else if (canvasIntent === 'no') {
-        return;
       } else if (canvasIntent === 'pending') {
         canvasIntent = detectCanvasIntent(currentText);
-        // Still ambiguous, or confirmed a plain chat reply → don't touch canvas.
+        // No <document> tag yet — it may still arrive (weak models preamble
+        // first), so stay pending and post nothing to the canvas.
         if (canvasIntent !== 'yes') {
           return;
         }

@@ -177,12 +177,11 @@ export default function useResumableSSE(
         if (!currentText) return;
         rawText = currentText;
         // 'always': the host already decided this turn targets the document.
-        // 'intent': decide per reply from the <document> marker; a plain chat
-        // reply (intent 'no') is left in the thread and never touches the canvas.
+        // 'intent': document work the moment <document> appears (preambles
+        // tolerated); while it's absent we stay pending and post nothing, so
+        // a plain chat reply never touches the canvas mid-stream.
         if (alwaysDocument) {
           canvasIntent = 'yes';
-        } else if (canvasIntent === 'no') {
-          return;
         } else if (canvasIntent === 'pending') {
           canvasIntent = detectCanvasIntent(currentText);
           if (canvasIntent !== 'yes') return;

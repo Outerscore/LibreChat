@@ -162,9 +162,14 @@ export type CanvasStreamMessage =
   | { type: 'outerscore:compliance-result'; findings: ComplianceFinding[] };
 
 /**
- * Per-turn canvas intent. A reply is document work only when it begins with
- * `<document>`; anything else is a normal chat reply, left untouched in the
- * thread. 'pending' while the streamed prefix is still a possible opening tag.
+ * Per-turn canvas intent. A reply is document work as soon as `<document>`
+ * appears anywhere in it — weak/local models often emit a short preamble
+ * before the tag, and a strict starts-with gate silently killed their live
+ * preview (chunks never streamed; the doc only landed at the final event).
+ * While the tag is absent the intent stays 'pending': it may still arrive in
+ * a later chunk, so only the final pass decides a reply was chat-only — a
+ * pending reply posts nothing to the canvas, which keeps in-chat Q&A intact.
+ * 'no' remains in the union for exhaustiveness but is no longer produced.
  */
 export type CanvasIntent = 'pending' | 'yes' | 'no';
 
@@ -190,14 +195,7 @@ export const isOnCanvasPage = (): boolean => {
 };
 
 export const detectCanvasIntent = (text: string): CanvasIntent => {
-  const t = text.replace(/^\s+/, '');
-  if (t.length === 0) {
-    return 'pending';
-  }
-  if (t.startsWith(DOC_OPEN)) {
-    return 'yes';
-  }
-  return DOC_OPEN.startsWith(t) ? 'pending' : 'no';
+  return text.includes(DOC_OPEN) ? 'yes' : 'pending';
 };
 
 /** Document body (between the tags) from a document-mode reply; envelope stripped. */
