@@ -80,7 +80,7 @@ const ConversationStarters = () => {
   }
 
   return (
-    <div className="mt-8 flex flex-wrap justify-center gap-3 px-4">
+    <div className="mb-8 flex flex-wrap justify-center gap-3 px-4">
       {starters.map(({ label, prompt }, index) => (
         <button
           key={index}
