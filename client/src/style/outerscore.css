@@ -120,6 +120,23 @@ body {
   background-color: var(--os-color-gray-100);
 }
 
+/* Embedded background: ONE uniform brand wash across the whole chat area —
+   header included. The wash lives on <main> (it wraps the header, messages and
+   composer); the header keeps no background of its own (its stock white fade is
+   disabled below) so nothing paints a differentiated bar over the wash. */
+.os-embedded .os-chat-main {
+  background: linear-gradient(
+    180deg,
+    #fff 0%,
+    var(--os-color-brand-25) 25%,
+    var(--os-color-brand-25) 75%,
+    #fff 100%
+  );
+}
+.os-embedded .os-chat-header {
+  background: none;
+}
+
 /* Landing greeting (embedded only): 👋 + "How can I help you?". */
 .os-embedded .os-landing-greeting {
   color: var(--os-color-gray-950);
