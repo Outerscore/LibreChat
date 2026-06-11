@@ -20,6 +20,7 @@ import {
   markMessageAsCanvasDoc,
   parseComplianceEnvelope,
   resolveCanvasRouting,
+  stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
 } from '~/utils/canvas';
 import store from '~/store';
@@ -117,7 +118,7 @@ export default function useSSE(
       }
       window.parent.postMessage(message, '*');
     };
-    const replaceLastAssistantWithPlaceholder = () => {
+    const replaceLastAssistantText = (newText: string) => {
       const msgs = getMessages();
       if (!msgs || msgs.length === 0) {
         return;
@@ -127,13 +128,9 @@ export default function useSSE(
       if (last.isCreatedByUser) {
         return;
       }
-      // Durable marker: this reply drove the canvas, so the display layer keeps
-      // masking it even after the user switches mode (always-mode docs carry no
-      // marker in their stored text).
-      markMessageAsCanvasDoc(last.messageId);
       const replaced: TMessage = {
         ...last,
-        text: CANVAS_PLACEHOLDER_TEXT,
+        text: newText,
         content: undefined,
       };
       const nextMessages = [...msgs.slice(0, lastIdx), replaced];
@@ -150,10 +147,41 @@ export default function useSSE(
           }
           return [
             ...prev.slice(0, prev.length - 1),
-            { ...prevLast, text: CANVAS_PLACEHOLDER_TEXT, content: undefined },
+            { ...prevLast, text: newText, content: undefined },
           ];
         });
       }
+    };
+    const replaceLastAssistantWithPlaceholder = () => {
+      const msgs = getMessages();
+      const last = msgs?.[msgs.length - 1];
+      if (!last || last.isCreatedByUser) {
+        return;
+      }
+      // Durable marker: this reply drove the canvas, so the display layer keeps
+      // masking it even after the user switches mode (always-mode docs carry no
+      // marker in their stored text).
+      markMessageAsCanvasDoc(last.messageId);
+      replaceLastAssistantText(CANVAS_PLACEHOLDER_TEXT);
+    };
+    // Chat mode forwards nothing, but a weak model may still emit the canvas
+    // envelopes despite the chat-only instructions — strip them so the reply
+    // reads as a clean chat bubble instead of raw tags.
+    const sanitizeChatModeReply = () => {
+      if (!isInIframe || canvasRouting !== 'chat' || !isOnCanvasPage()) {
+        return;
+      }
+      const msgs = getMessages() ?? [];
+      const last = msgs[msgs.length - 1];
+      if (!last || last.isCreatedByUser) {
+        return;
+      }
+      const current = extractMessageText(last);
+      const stripped = stripCanvasEnvelopes(current);
+      if (!stripped || stripped === current.trim()) {
+        return;
+      }
+      replaceLastAssistantText(stripped);
     };
     clearStepMaps();
 
@@ -230,6 +258,7 @@ export default function useSSE(
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
         forwardCanvasStream();
+        sanitizeChatModeReply();
         if (canvasCapable) {
           if (alwaysDocument) {
             canvasIntent = 'yes';

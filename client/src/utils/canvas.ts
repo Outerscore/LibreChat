@@ -329,19 +329,39 @@ export const isMessageCanvasDoc = (messageId?: string | null): boolean => {
 };
 
 /**
+ * Strip canvas envelopes (`<document>` tags + the `<compliance>` block) from a
+ * reply so it reads as plain content. Used on chat-mode replies from models
+ * that emit the envelopes despite the chat-only instructions (weak/local ones).
+ */
+export const stripCanvasEnvelopes = (text: string): string => {
+  if (!text) {
+    return text;
+  }
+  const { stripped } = parseComplianceEnvelope(text);
+  return stripped.replace(DOC_OPEN, '').replace(DOC_CLOSE, '').trim();
+};
+
+/**
  * Display decision for an assistant reply on a canvas page: mask it with the
  * "written to canvas" indicator, or render it as a normal chat bubble.
- * Under 'always' routing every reply is the document (and carries no marker),
- * so everything is masked; under 'intent' and 'chat' a reply is masked when it
- * is doc-shaped OR known (by id) to have driven the canvas — which is what
- * lets Q&A and chat-mode replies render in the thread while past document
- * turns stay masked after a mode switch.
+ *  - 'always': every reply is the document (and carries no marker) — mask all.
+ *  - 'chat': nothing is forwarded, so a doc-shaped reply was NOT written to
+ *    the canvas — never claim it was. Mask only turns that genuinely drove the
+ *    canvas: a recorded id or the in-session placeholder text.
+ *  - 'intent': mask doc-shaped replies and recorded ids.
  */
 export const shouldMaskCanvasReply = (text: string, messageId?: string | null): boolean => {
-  if (resolveCanvasRouting() === 'always') {
+  const routing = resolveCanvasRouting();
+  if (routing === 'always') {
     return true;
   }
-  return isDocumentReplyText(text) || isMessageCanvasDoc(messageId);
+  if (isMessageCanvasDoc(messageId)) {
+    return true;
+  }
+  if (routing === 'chat') {
+    return text.trim() === CANVAS_PLACEHOLDER_TEXT;
+  }
+  return isDocumentReplyText(text);
 };
 
 /** Document body (between the tags) from a document-mode reply; envelope stripped. */

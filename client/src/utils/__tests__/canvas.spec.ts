@@ -10,6 +10,7 @@ import {
   resolveCanvasRouting,
   setCanvasMode,
   shouldMaskCanvasReply,
+  stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
 } from '../canvas';
 
@@ -94,6 +95,14 @@ describe('canvas — user mode & routing', () => {
       expect(shouldMaskCanvasReply(CANVAS_PLACEHOLDER_TEXT)).toBe(true);
     });
 
+    it("does not mask a doc-shaped reply in 'chat' mode — nothing was written to the canvas", () => {
+      setCanvasMode('chat');
+      expect(shouldMaskCanvasReply('<document>Body</document>')).toBe(false);
+      expect(
+        shouldMaskCanvasReply('Answer\n<compliance>{"findings":[]}</compliance>'),
+      ).toBe(false);
+    });
+
     it("masks everything in 'document' (always) mode — doc replies carry no marker", () => {
       setCanvasMode('document');
       expect(shouldMaskCanvasReply('Untagged markdown that IS the document')).toBe(true);
@@ -107,6 +116,27 @@ describe('canvas — user mode & routing', () => {
         true,
       );
       expect(shouldMaskCanvasReply('Plain Q&A answer', 'msg-chat-1')).toBe(false);
+    });
+  });
+
+  describe('stripCanvasEnvelopes', () => {
+    it('removes document tags and the compliance envelope', () => {
+      expect(
+        stripCanvasEnvelopes(
+          '<document>\n## Body\n</document>\n<compliance>{"findings":[]}</compliance>',
+        ),
+      ).toBe('## Body');
+    });
+
+    it('removes a trailing envelope from an untagged chat reply', () => {
+      expect(
+        stripCanvasEnvelopes('A plain answer.\n<compliance>{"findings":[]}</compliance>'),
+      ).toBe('A plain answer.');
+    });
+
+    it('leaves a clean reply unchanged (modulo trimming)', () => {
+      expect(stripCanvasEnvelopes('  A plain answer.  ')).toBe('A plain answer.');
+      expect(stripCanvasEnvelopes('')).toBe('');
     });
   });
 
