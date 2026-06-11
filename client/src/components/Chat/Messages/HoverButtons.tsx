@@ -11,6 +11,7 @@ import {
 } from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
+import { extractDocBody } from '~/utils/canvas';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
@@ -53,7 +54,8 @@ const sendToCanvas = (content: string) => {
   window.parent.postMessage(
     {
       type: 'outerscore:content',
-      html: content,
+      // Body only — the host editor must never see raw <document>/<compliance> tags.
+      html: extractDocBody(content),
     },
     '*',
   );

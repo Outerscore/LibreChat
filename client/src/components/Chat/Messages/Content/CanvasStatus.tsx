@@ -1,5 +1,5 @@
 import type { TMessageContentParts } from 'librechat-data-provider';
-import { isOnCanvasPage } from '~/utils/canvas';
+import { extractDocBody, isOnCanvasPage } from '~/utils/canvas';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 
@@ -27,19 +27,25 @@ const extractPartsText = (content?: Array<TMessageContentParts | undefined>): st
 };
 
 /**
- * Pushes a completed assistant message's text to the parent canvas. Used when the
- * displayed variant changes outside of live streaming (e.g. switching regenerate
- * siblings), so the canvas reflects the selected answer.
+ * Pushes the active assistant message's document body to the parent canvas
+ * (envelope stripped — the host editor must never see raw `<document>` tags).
+ * `initial: true` marks a mount-time re-announcement (conversation reopen /
+ * message remount) rather than a user-driven change — the host only applies an
+ * initial post when its editor is empty, so reopening a restored conversation
+ * can never clobber the current document.
  */
-export const postCanvasContent = (content?: Array<TMessageContentParts | undefined>): void => {
+export const postCanvasContent = (
+  content?: Array<TMessageContentParts | undefined>,
+  initial = false,
+): void => {
   if (typeof window === 'undefined' || window.parent === window) {
     return;
   }
-  const text = extractPartsText(content);
+  const text = extractDocBody(extractPartsText(content));
   if (!text) {
     return;
   }
-  window.parent.postMessage({ type: 'outerscore:content', html: text }, '*');
+  window.parent.postMessage({ type: 'outerscore:content', html: text, initial }, '*');
 };
 
 export const CanvasWritingIndicator = () => {

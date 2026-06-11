@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback, useEffect } from 'react';
+import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
 import { ContentTypes } from 'librechat-data-provider';
 import type {
   TMessageContentParts,
@@ -151,17 +151,36 @@ const ContentParts = memo(function ContentParts({
     ],
   );
 
+  const canvasSyncRef = useRef<{
+    content: Array<TMessageContentParts | undefined> | undefined;
+    wasSubmitting: boolean;
+  } | null>(null);
+
   // Canvas2 mode: keep the canvas in sync with the active (last) assistant message when
-  // it changes outside of live streaming — e.g. switching regenerate siblings — so the
-  // prev/next arrows actually swap the canvas content.
+  // it changes outside of live streaming — e.g. switching regenerate siblings.
+  // Three cases are told apart:
+  //  - generation settle (was submitting on the previous run): skipped — the live
+  //    stream-end already committed this body; re-posting raced the host's history
+  //    recording and produced duplicate entries.
+  //  - first run after mount (conversation reopen / message remount): posted with
+  //    initial: true, which the host only applies to an empty editor (no clobber).
+  //  - a real change while mounted (sibling switch): posted normally.
   useEffect(() => {
     if (isCreatedByUser || edit === true || !isLast || !isCanvas2Mode()) {
       return;
     }
-    if (effectiveIsSubmitting) {
+    const prev = canvasSyncRef.current;
+    canvasSyncRef.current = { content, wasSubmitting: effectiveIsSubmitting };
+    if (effectiveIsSubmitting || prev?.wasSubmitting) {
       return;
     }
-    postCanvasContent(content);
+    if (prev == null) {
+      postCanvasContent(content, true);
+      return;
+    }
+    if (prev.content !== content) {
+      postCanvasContent(content);
+    }
   }, [content, isCreatedByUser, edit, isLast, effectiveIsSubmitting]);
 
   // Canvas2 mode: never render assistant content in the chat panel — show a status
