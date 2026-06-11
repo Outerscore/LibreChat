@@ -43,6 +43,7 @@ export const extractPartsText = (content?: Array<TMessageContentParts | undefine
 export const postCanvasContent = (
   content?: Array<TMessageContentParts | undefined>,
   initial = false,
+  messageId?: string | null,
 ): void => {
   if (typeof window === 'undefined' || window.parent === window) {
     return;
@@ -53,7 +54,7 @@ export const postCanvasContent = (
     return;
   }
   const raw = extractPartsText(content);
-  if (raw.trim() === CANVAS_PLACEHOLDER_TEXT || !shouldMaskCanvasReply(raw)) {
+  if (raw.trim() === CANVAS_PLACEHOLDER_TEXT || !shouldMaskCanvasReply(raw, messageId)) {
     return;
   }
   const text = extractDocBody(raw);

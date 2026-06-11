@@ -4,6 +4,8 @@ import {
   extractDocBody,
   getCanvasMode,
   isDocumentReplyText,
+  isMessageCanvasDoc,
+  markMessageAsCanvasDoc,
   parseComplianceEnvelope,
   resolveCanvasRouting,
   setCanvasMode,
@@ -95,6 +97,33 @@ describe('canvas — user mode & routing', () => {
     it("masks everything in 'document' (always) mode — doc replies carry no marker", () => {
       setCanvasMode('document');
       expect(shouldMaskCanvasReply('Untagged markdown that IS the document')).toBe(true);
+    });
+
+    it('keeps masking a marker-less doc reply after a mode switch via its recorded id', () => {
+      // Generated under 'document' (always) routing: no marker in the text.
+      markMessageAsCanvasDoc('msg-doc-1');
+      setCanvasMode('chat');
+      expect(shouldMaskCanvasReply('Untagged markdown that IS the document', 'msg-doc-1')).toBe(
+        true,
+      );
+      expect(shouldMaskCanvasReply('Plain Q&A answer', 'msg-chat-1')).toBe(false);
+    });
+  });
+
+  describe('markMessageAsCanvasDoc / isMessageCanvasDoc', () => {
+    it('round-trips a recorded id and ignores unknown / missing ids', () => {
+      expect(isMessageCanvasDoc('m1')).toBe(false);
+      markMessageAsCanvasDoc('m1');
+      expect(isMessageCanvasDoc('m1')).toBe(true);
+      expect(isMessageCanvasDoc('m2')).toBe(false);
+      expect(isMessageCanvasDoc(undefined)).toBe(false);
+      expect(isMessageCanvasDoc(null)).toBe(false);
+    });
+
+    it('persists ids to localStorage', () => {
+      markMessageAsCanvasDoc('m-persisted');
+      const stored = JSON.parse(localStorage.getItem('outerscore:canvas-doc-ids') ?? '[]');
+      expect(stored).toContain('m-persisted');
     });
   });
 

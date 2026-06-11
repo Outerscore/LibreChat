@@ -177,13 +177,13 @@ const ContentParts = memo(function ContentParts({
       return;
     }
     if (prev == null) {
-      postCanvasContent(content, true);
+      postCanvasContent(content, true, messageId);
       return;
     }
     if (prev.content !== content) {
-      postCanvasContent(content);
+      postCanvasContent(content, false, messageId);
     }
-  }, [content, isCreatedByUser, edit, isLast, effectiveIsSubmitting]);
+  }, [content, isCreatedByUser, edit, isLast, effectiveIsSubmitting, messageId]);
 
   // Canvas page: mask only replies that are document work (routing-aware) — a
   // chat-mode or intent-routed Q&A reply renders as a normal bubble. Edit mode
@@ -192,7 +192,7 @@ const ContentParts = memo(function ContentParts({
     !isCreatedByUser &&
     edit !== true &&
     isCanvas2Mode() &&
-    shouldMaskCanvasReply(extractPartsText(content))
+    shouldMaskCanvasReply(extractPartsText(content), messageId)
   ) {
     return effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
   }

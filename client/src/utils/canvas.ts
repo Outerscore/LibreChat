@@ -277,18 +277,71 @@ export const isDocumentReplyText = (text: string): boolean => {
   );
 };
 
+/* ── Canvas-doc message registry ─────────────────────────────────────────────
+ * 'always'-mode document replies are plain markdown with no marker in the
+ * stored text, so once the user switches modes nothing distinguishes a past
+ * document turn from a chat answer. The hooks record the messageId of every
+ * reply they actually forward to the canvas; the display layer keeps masking
+ * those forever, regardless of the mode selected later. localStorage (capped)
+ * so the memory survives reloads. */
+
+const CANVAS_DOC_IDS_KEY = 'outerscore:canvas-doc-ids';
+const CANVAS_DOC_IDS_MAX = 300;
+
+let canvasDocIdsCache: string[] | null = null;
+
+const readCanvasDocIds = (): string[] => {
+  if (canvasDocIdsCache) {
+    return canvasDocIdsCache;
+  }
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(CANVAS_DOC_IDS_KEY) ?? '[]');
+    canvasDocIdsCache = Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === 'string')
+      : [];
+  } catch {
+    canvasDocIdsCache = [];
+  }
+  return canvasDocIdsCache;
+};
+
+/** Record that a message's reply was written to the canvas (called by the SSE hooks). */
+export const markMessageAsCanvasDoc = (messageId?: string | null): void => {
+  if (!messageId) {
+    return;
+  }
+  const ids = readCanvasDocIds().filter((id) => id !== messageId);
+  ids.push(messageId);
+  canvasDocIdsCache = ids.slice(-CANVAS_DOC_IDS_MAX);
+  try {
+    localStorage.setItem(CANVAS_DOC_IDS_KEY, JSON.stringify(canvasDocIdsCache));
+  } catch {
+    // storage unavailable — the in-memory cache still covers this session.
+  }
+};
+
+/** True when this message's reply is known to have been written to the canvas. */
+export const isMessageCanvasDoc = (messageId?: string | null): boolean => {
+  if (!messageId) {
+    return false;
+  }
+  return readCanvasDocIds().includes(messageId);
+};
+
 /**
  * Display decision for an assistant reply on a canvas page: mask it with the
  * "written to canvas" indicator, or render it as a normal chat bubble.
  * Under 'always' routing every reply is the document (and carries no marker),
- * so everything is masked; under 'intent' and 'chat' only doc-shaped replies
- * are — which is what lets Q&A and chat-mode replies render in the thread.
+ * so everything is masked; under 'intent' and 'chat' a reply is masked when it
+ * is doc-shaped OR known (by id) to have driven the canvas — which is what
+ * lets Q&A and chat-mode replies render in the thread while past document
+ * turns stay masked after a mode switch.
  */
-export const shouldMaskCanvasReply = (text: string): boolean => {
+export const shouldMaskCanvasReply = (text: string, messageId?: string | null): boolean => {
   if (resolveCanvasRouting() === 'always') {
     return true;
   }
-  return isDocumentReplyText(text);
+  return isDocumentReplyText(text) || isMessageCanvasDoc(messageId);
 };
 
 /** Document body (between the tags) from a document-mode reply; envelope stripped. */

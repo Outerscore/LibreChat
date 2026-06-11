@@ -17,6 +17,7 @@ import {
   extractDocBody,
   extractMessageText,
   isOnCanvasPage,
+  markMessageAsCanvasDoc,
   parseComplianceEnvelope,
   resolveCanvasRouting,
   CANVAS_PLACEHOLDER_TEXT,
@@ -126,6 +127,10 @@ export default function useSSE(
       if (last.isCreatedByUser) {
         return;
       }
+      // Durable marker: this reply drove the canvas, so the display layer keeps
+      // masking it even after the user switches mode (always-mode docs carry no
+      // marker in their stored text).
+      markMessageAsCanvasDoc(last.messageId);
       const replaced: TMessage = {
         ...last,
         text: CANVAS_PLACEHOLDER_TEXT,

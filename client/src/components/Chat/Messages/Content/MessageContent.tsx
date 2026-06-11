@@ -174,7 +174,7 @@ const MessageContent = ({
   // Canvas page: mask only replies that are document work (routing-aware) — a
   // chat-mode or intent-routed Q&A reply renders as a normal bubble. A doc turn
   // streaming under 'intent' flips to the indicator once its <document> tag lands.
-  if (!message.isCreatedByUser && isCanvas2Mode() && shouldMaskCanvasReply(text)) {
+  if (!message.isCreatedByUser && isCanvas2Mode() && shouldMaskCanvasReply(text, messageId)) {
     const inFlight = isSubmitting || (isLast && regularContent.length === 0);
     return inFlight ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
   }
