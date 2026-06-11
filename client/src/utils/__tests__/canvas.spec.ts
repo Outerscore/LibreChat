@@ -1,4 +1,93 @@
-import { detectCanvasIntent, extractDocBody, parseComplianceEnvelope } from '../canvas';
+import {
+  buildCanvasSystemPrompt,
+  detectCanvasIntent,
+  extractDocBody,
+  getCanvasMode,
+  parseComplianceEnvelope,
+  resolveCanvasRouting,
+  setCanvasMode,
+} from '../canvas';
+
+const PAGE_KEY = 'outerscore:page';
+const MODE_KEY = 'outerscore:canvas-mode';
+
+describe('canvas — user mode & routing', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  describe('getCanvasMode / setCanvasMode', () => {
+    it("defaults to 'auto' when nothing is stored", () => {
+      expect(getCanvasMode()).toBe('auto');
+    });
+
+    it("falls back to 'auto' on an unknown stored value", () => {
+      sessionStorage.setItem(MODE_KEY, 'bogus');
+      expect(getCanvasMode()).toBe('auto');
+    });
+
+    it('round-trips chat and document', () => {
+      setCanvasMode('chat');
+      expect(getCanvasMode()).toBe('chat');
+      setCanvasMode('document');
+      expect(getCanvasMode()).toBe('document');
+    });
+
+    it("clears the stored value when set back to 'auto'", () => {
+      setCanvasMode('document');
+      setCanvasMode('auto');
+      expect(sessionStorage.getItem(MODE_KEY)).toBeNull();
+      expect(getCanvasMode()).toBe('auto');
+    });
+  });
+
+  describe('resolveCanvasRouting', () => {
+    it("maps an explicit 'chat' mode to 'chat' routing", () => {
+      setCanvasMode('chat');
+      expect(resolveCanvasRouting()).toBe('chat');
+    });
+
+    it("maps an explicit 'document' mode to 'always' routing", () => {
+      setCanvasMode('document');
+      expect(resolveCanvasRouting()).toBe('always');
+    });
+
+    it("falls back to the env lever ('intent' by default) in 'auto' mode", () => {
+      expect(resolveCanvasRouting()).toBe('intent');
+    });
+  });
+
+  describe('buildCanvasSystemPrompt — per-mode prompts', () => {
+    it('returns an empty prompt off canvas pages regardless of mode', () => {
+      setCanvasMode('document');
+      expect(buildCanvasSystemPrompt()).toBe('');
+    });
+
+    it("instructs intent-based routing via <document> in 'auto' mode", () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('Decide how to respond');
+      expect(prompt).toContain('<document>');
+    });
+
+    it("instructs a chat-only reply (no tags) in 'chat' mode", () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      setCanvasMode('chat');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('chat-only mode');
+      expect(prompt).not.toContain('Decide how to respond');
+      expect(prompt).not.toContain('Begin your reply with the <document> tag');
+    });
+
+    it("instructs an unconditional document rewrite in 'document' mode", () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      setCanvasMode('document');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('COMPLETE updated');
+      expect(prompt).not.toContain('Decide how to respond');
+    });
+  });
+});
 
 describe('canvas — host-bound stream parsing', () => {
   describe('detectCanvasIntent', () => {

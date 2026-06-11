@@ -2,7 +2,59 @@ import type { TMessage } from 'librechat-data-provider';
 
 const CANVAS_CONTEXT_KEY = 'outerscore:canvas-content';
 const CANVAS_PAGE_KEY = 'outerscore:page';
+const CANVAS_MODE_KEY = 'outerscore:canvas-mode';
 const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
+
+/**
+ * User-selected canvas mode (the composer toggle on canvas pages):
+ *  - 'auto'     — routing follows `VITE_OUTERSCORE_CANVAS_ROUTING` ('intent' by
+ *    default: the model decides chat-vs-document per turn via `<document>`).
+ *  - 'chat'     — replies always stay in the chat; the canvas is never touched.
+ *  - 'document' — every reply IS the document (the 'always' behaviour), on any model.
+ * Stored in sessionStorage so it survives reloads within the embedded session
+ * and is shared by the prompt builder and both SSE hooks.
+ */
+export type CanvasMode = 'auto' | 'chat' | 'document';
+
+/** Effective per-turn routing after folding the user mode into the env lever. */
+export type CanvasRouting = 'intent' | 'always' | 'chat';
+
+export const getCanvasMode = (): CanvasMode => {
+  try {
+    const value = sessionStorage.getItem(CANVAS_MODE_KEY);
+    return value === 'chat' || value === 'document' ? value : 'auto';
+  } catch {
+    return 'auto';
+  }
+};
+
+export const setCanvasMode = (mode: CanvasMode): void => {
+  try {
+    if (mode === 'auto') {
+      sessionStorage.removeItem(CANVAS_MODE_KEY);
+    } else {
+      sessionStorage.setItem(CANVAS_MODE_KEY, mode);
+    }
+  } catch {
+    // sessionStorage unavailable — mode simply stays 'auto'.
+  }
+};
+
+/**
+ * The single routing decision both the prompt builder and the SSE hooks consume:
+ * an explicit user mode ('chat' / 'document') wins; 'auto' falls back to the
+ * env lever ('always' for weak local models, 'intent' otherwise).
+ */
+export const resolveCanvasRouting = (): CanvasRouting => {
+  const mode = getCanvasMode();
+  if (mode === 'chat') {
+    return 'chat';
+  }
+  if (mode === 'document') {
+    return 'always';
+  }
+  return isCanvasRoutingAlways() ? 'always' : 'intent';
+};
 
 interface CanvasSpec {
   /** Human name of the artifact, e.g. "SOW Project Brief". */
@@ -38,7 +90,7 @@ const complianceClause = (rules: string[]): string =>
  * Returned as *system* instructions so the document + rules never appear in the
  * visible user message.
  */
-const buildSpecPrompt = (spec: CanvasSpec, document: string, alwaysDocument: boolean): string => {
+const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRouting): string => {
   const trimmed = document.trim();
   const context = [
     `You are an assistant embedded next to a ${spec.artifact} editor on the Outerscore procurement platform.`,
@@ -48,11 +100,21 @@ const buildSpecPrompt = (spec: CanvasSpec, document: string, alwaysDocument: boo
     '',
   ];
 
+  // 'chat' routing: the user pinned the toggle to chat-only — answer normally,
+  // never produce a document. The SSE hooks also drop any canvas forwarding in
+  // this mode, so this instruction is belt-and-braces for weak models.
+  if (routing === 'chat') {
+    return [
+      ...context,
+      `Reply as a helpful assistant in plain Markdown. You may quote or refer to the ${spec.artifact} content above, but do NOT output a rewritten ${spec.artifact} and never use <document> or <compliance> tags — the user has chat-only mode enabled and your reply stays in the chat.`,
+    ].join('\n');
+  }
+
   // 'always' routing: the host has already decided this turn targets the
   // document, so don't ask the model to choose — just have it write the doc.
   // No <document> envelope is required, which is what lets weaker / local
   // models (Ollama) drive the canvas reliably.
-  if (alwaysDocument) {
+  if (routing === 'always') {
     return [
       ...context,
       `Treat the user's message as an instruction to create or revise the ${spec.artifact}. Reply with the COMPLETE updated ${spec.artifact} in Markdown — no preamble, no commentary, no code fences.`,
@@ -133,8 +195,8 @@ export const buildCanvasSystemPrompt = (): string => {
     return '';
   }
   const spec = SPEC_BY_PAGE[page] ?? GENERIC_SPEC;
-  return buildSpecPrompt(spec, canvas, isCanvasRoutingAlways());
-}
+  return buildSpecPrompt(spec, canvas, resolveCanvasRouting());
+};
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Host-bound stream parsing
@@ -228,7 +290,7 @@ export const parseComplianceEnvelope = (
   }
   let findings: ComplianceFinding[] = [];
   try {
-    const parsed = JSON.parse(match[1]);
+    const parsed = JSON.parse(match[1]) as { findings?: unknown };
     if (Array.isArray(parsed?.findings)) {
       findings = parsed.findings.reduce<ComplianceFinding[]>((acc, item) => {
         if (
@@ -287,4 +349,4 @@ export const extractMessageText = (message: TMessage | undefined | null): string
       .join('');
   }
   return typeof message.text === 'string' ? message.text : '';
-};;
+};

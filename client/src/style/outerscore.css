@@ -167,6 +167,37 @@ body {
     0 4px 8px rgba(15, 6, 48, 0.1);
 }
 
+/* Canvas mode toggle (embedded canvas pages only): the Auto / Chat / Document
+   segmented control in the composer's action row. Tokens over hex so it tracks
+   the host theme like the rest of the re-skin. */
+.os-embedded .os-mode-toggle {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--os-color-gray-100);
+  border-radius: 9999px;
+  background-color: var(--os-color-gray-50);
+}
+.os-embedded .os-mode-chip {
+  padding: 2px 10px;
+  border-radius: 9999px;
+  color: var(--os-color-gray-600);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s ease-in-out,
+    color 0.15s ease-in-out;
+}
+.os-embedded .os-mode-chip:hover {
+  color: var(--os-color-brand-600);
+}
+.os-embedded .os-mode-chip--active {
+  background-color: var(--os-color-white);
+  color: var(--os-color-brand-600);
+  box-shadow: 0 1px 2px rgba(15, 6, 48, 0.08);
+}
+
 /* Embedded only: the chat footer is hidden in the iframe, so the composer's
    `sm:mb-10`/`sm:mb-28` bottom margin just leaves dead space at the bottom of
    the host window. Tighten it. Higher specificity beats the Tailwind utility;

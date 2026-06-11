@@ -33,7 +33,7 @@ import {
   extractMessageText,
   isOnCanvasPage,
   parseComplianceEnvelope,
-  isCanvasRoutingAlways,
+  resolveCanvasRouting,
   CANVAS_PLACEHOLDER_TEXT,
 } from '~/utils/canvas';
 import store from '~/store';
@@ -159,11 +159,13 @@ export default function useResumableSSE(
       let canvasStreamStarted = false;
       let canvasIntent: CanvasIntent = 'pending';
       const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-      const shouldPostToCanvas = isInIframe && isOnCanvasPage();
-      // Routing lever (see utils/canvas): 'always' forwards every canvas-page reply
-      // as the document (weak/local models); 'intent' (default, Claude) lets the
+      // Routing (see utils/canvas): the user's composer toggle wins, else the env
+      // lever. 'chat' never touches the canvas; 'always' forwards every reply as
+      // the document (weak/local models); 'intent' (default, Claude) lets the
       // model decide via the <document> envelope, which keeps in-chat Q&A working.
-      const alwaysDocument = isCanvasRoutingAlways();
+      const canvasRouting = resolveCanvasRouting();
+      const shouldPostToCanvas = isInIframe && isOnCanvasPage() && canvasRouting !== 'chat';
+      const alwaysDocument = canvasRouting === 'always';
       const postToCanvas = (message: CanvasStreamMessage) => {
         if (!shouldPostToCanvas) return;
         window.parent.postMessage(message, '*');

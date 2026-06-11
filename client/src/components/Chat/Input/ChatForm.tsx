@@ -25,6 +25,7 @@ import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
 import { cn, removeFocusRings } from '~/utils';
+import CanvasModeToggle from './CanvasModeToggle';
 import TextareaHeader from './TextareaHeader';
 import PromptsCommand from './PromptsCommand';
 import AudioRecorder from './AudioRecorder';
@@ -356,6 +357,7 @@ const ChatForm = memo(function ChatForm({
                   Array.isArray(conversation?.messages) && conversation.messages.length >= 1
                 }
               />
+              <CanvasModeToggle />
               <div className="mx-auto flex" />
               {SpeechToText && (
                 <AudioRecorder
