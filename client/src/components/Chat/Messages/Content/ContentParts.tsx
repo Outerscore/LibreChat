@@ -187,14 +187,26 @@ const ContentParts = memo(function ContentParts({
 
   // Canvas page: mask only replies that are document work (routing-aware) — a
   // chat-mode or intent-routed Q&A reply renders as a normal bubble. Edit mode
-  // is exempt.
+  // is exempt. Reasoning/think parts are NOT masked: only the document text is
+  // replaced by the indicator, the model's thoughts stay readable in the chat.
   if (
     !isCreatedByUser &&
     edit !== true &&
     isCanvas2Mode() &&
-    shouldMaskCanvasReply(extractPartsText(content), messageId)
+    shouldMaskCanvasReply(extractPartsText(content), messageId, isLast && effectiveIsSubmitting)
   ) {
-    return effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
+    const thinkParts: PartWithIndex[] = [];
+    content?.forEach((part, idx) => {
+      if (part?.type === ContentTypes.THINK) {
+        thinkParts.push({ part, idx });
+      }
+    });
+    return (
+      <>
+        {thinkParts.map(({ part, idx }) => renderPart(part, idx, false))}
+        {effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />}
+      </>
+    );
   }
 
   // Early return: no content

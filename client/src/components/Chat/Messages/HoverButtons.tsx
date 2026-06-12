@@ -11,7 +11,13 @@ import {
 } from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
-import { extractDocBody } from '~/utils/canvas';
+import {
+  extractDocBody,
+  extractMessageText,
+  isOnCanvasPage,
+  postToParent,
+  shouldMaskCanvasReply,
+} from '~/utils/canvas';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
@@ -47,18 +53,15 @@ type HoverButtonProps = {
 
 const isInIframe = typeof window !== 'undefined' && window.parent !== window;
 
-const sendToCanvas = (content: string) => {
-  if (typeof window === 'undefined' || window.parent === window) {
+const sendToCanvas = (message: TMessage) => {
+  // extractMessageText skips reasoning/think parts — the host editor must
+  // receive the answer only, never the model's thinking; extractDocBody then
+  // strips the <document>/<compliance> envelopes.
+  const html = extractDocBody(extractMessageText(message));
+  if (!html) {
     return;
   }
-  window.parent.postMessage(
-    {
-      type: 'outerscore:content',
-      // Body only — the host editor must never see raw <document>/<compliance> tags.
-      html: extractDocBody(content),
-    },
-    '*',
-  );
+  postToParent({ type: 'outerscore:content', html });
 };
 
 const extractMessageContent = (message: TMessage): string => {
@@ -243,15 +246,21 @@ const HoverButtons = ({
         )}
       />
 
-      {/* Send to Canvas Button */}
-      {!isCreatedByUser && isInIframe && (
-        <HoverButton
-          onClick={() => sendToCanvas(extractMessageContent(message))}
-          title={localize('com_ui_send_to_canvas')}
-          icon={<SendIcon size={19} className="text-text-secondary-alt" />}
-          isLast={isLast}
-        />
-      )}
+      {/* Send to Canvas Button — hidden once a reply was already written to the
+          canvas (masked as the "written to canvas" indicator): there is nothing
+          meaningful left to send, only the placeholder. */}
+      {!isCreatedByUser &&
+        isInIframe &&
+        !(
+          isOnCanvasPage() && shouldMaskCanvasReply(extractMessageText(message), message.messageId)
+        ) && (
+          <HoverButton
+            onClick={() => sendToCanvas(message)}
+            title={localize('com_ui_send_to_canvas')}
+            icon={<SendIcon size={19} className="text-text-secondary-alt" />}
+            isLast={isLast}
+          />
+        )}
 
       {/* Edit Button */}
       {isEditableEndpoint && (

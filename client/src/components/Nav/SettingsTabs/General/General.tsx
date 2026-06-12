@@ -188,9 +188,14 @@ function General() {
           <ThemeSelector theme={theme} onChange={changeTheme} />
         </div>
       )}
-      <div className="pb-3">
-        <LangSelector langcode={langcode} onChange={changeLang} />
-      </div>
+      {/* Language switch is hidden when embedded — Outerscore (EN / DE) is the
+          single source of truth and pushes its language via the postMessage
+          bridge, so an in-chat selector would immediately be overridden. */}
+      {!isOuterscoreContext() && (
+        <div className="pb-3">
+          <LangSelector langcode={langcode} onChange={changeLang} />
+        </div>
+      )}
       {toggleSwitchConfigs.map((config) => (
         <div key={config.key} className="pb-3">
           <ToggleSwitch

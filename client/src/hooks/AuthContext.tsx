@@ -171,11 +171,27 @@ const AuthContextProvider = ({
     currentUserId: user?.id,
     onSuccess: (data) => {
       setError(undefined);
+      /** Preserve the current location instead of hard-redirecting to /c/new:
+       * the Outerscore host deep-links /c/<id> to restore a docked conversation
+       * when the panel reopens, and the bridge login runs on every iframe boot —
+       * a fixed '/c/new' here clobbered the restored route (and the bounce made
+       * the conversation bridge post null, wiping the host's memory of it). */
+      const baseUrl = apiBaseUrl();
+      const rawPath = window.location.pathname;
+      const strippedPath =
+        baseUrl && (rawPath === baseUrl || rawPath.startsWith(baseUrl + '/'))
+          ? rawPath.slice(baseUrl.length) || '/'
+          : rawPath;
+      const currentUrl = `${strippedPath}${window.location.search}`;
+      const preserveCurrent =
+        isSafeRedirect(currentUrl) &&
+        !currentUrl.startsWith('/login') &&
+        !currentUrl.startsWith('/register');
       setUserContext({
         token: data.token,
         isAuthenticated: true,
         user: data.user,
-        redirect: '/c/new',
+        redirect: preserveCurrent ? currentUrl : '/c/new',
       });
     },
     onUserSwitch: () => {

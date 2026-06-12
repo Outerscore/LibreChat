@@ -34,6 +34,8 @@ import {
   isOnCanvasPage,
   markMessageAsCanvasDoc,
   parseComplianceEnvelope,
+  postToParent,
+  replaceTextParts,
   resolveCanvasRouting,
   stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
@@ -170,7 +172,7 @@ export default function useResumableSSE(
       const alwaysDocument = canvasRouting === 'always';
       const postToCanvas = (message: CanvasStreamMessage) => {
         if (!shouldPostToCanvas) return;
-        window.parent.postMessage(message, '*');
+        postToParent(message);
       };
       const forwardCanvasStream = () => {
         if (!shouldPostToCanvas) return;
@@ -207,10 +209,11 @@ export default function useResumableSSE(
         const lastIdx = msgs.length - 1;
         const last = msgs[lastIdx];
         if (last.isCreatedByUser) return;
+        // Replace only the TEXT parts — reasoning/think parts stay visible in chat.
         const replaced: TMessage = {
           ...last,
           text: newText,
-          content: undefined,
+          content: replaceTextParts(last.content, newText),
         };
         setMessages([...msgs.slice(0, lastIdx), replaced]);
         const convoId = last.conversationId ?? currentSubmission.conversation?.conversationId;
@@ -221,7 +224,7 @@ export default function useResumableSSE(
             if (prevLast.isCreatedByUser) return prev;
             return [
               ...prev.slice(0, prev.length - 1),
-              { ...prevLast, text: newText, content: undefined },
+              { ...prevLast, text: newText, content: replaceTextParts(prevLast.content, newText) },
             ];
           });
         }

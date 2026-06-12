@@ -75,6 +75,17 @@ try {
           /* ignore */
         }
       }
+      if (data.type === 'outerscore:language' && typeof data.lang === 'string') {
+        // The host app language ('en' | 'de'). Persisted for the React-side
+        // bridge (which maps it to a LibreChat locale and applies it), plus a
+        // CustomEvent for runtime switches after React has mounted.
+        try {
+          sessionStorage.setItem('outerscore:lang', data.lang);
+        } catch {
+          /* ignore */
+        }
+        window.dispatchEvent(new CustomEvent('outerscore:language-changed'));
+      }
       if (data.type === 'outerscore:logout') {
         clearOuterscoreToken();
         try {
@@ -87,7 +98,9 @@ try {
     });
 
     try {
-      window.parent.postMessage({ type: 'outerscore:ready' }, '*');
+      // Pin the handshake to the configured host origin in production; '*'
+      // remains only as the unconfigured-dev fallback.
+      window.parent.postMessage({ type: 'outerscore:ready' }, parentOrigin || '*');
     } catch {
       /* ignore */
     }

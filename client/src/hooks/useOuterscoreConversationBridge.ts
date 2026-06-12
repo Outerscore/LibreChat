@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Constants } from 'librechat-data-provider';
 import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
+import { postToParent } from '~/utils/canvas';
 
 /**
  * Posts the active conversation id to the Outerscore host so a docked AI panel
@@ -28,10 +29,6 @@ export default function useOuterscoreConversationBridge(conversationId: string) 
     }
     lastPostedRef.current = id;
 
-    try {
-      window.parent.postMessage({ type: 'outerscore:conversation', conversationId: id }, '*');
-    } catch {
-      /* ignore */
-    }
+    postToParent({ type: 'outerscore:conversation', conversationId: id });
   }, [conversationId]);
 }

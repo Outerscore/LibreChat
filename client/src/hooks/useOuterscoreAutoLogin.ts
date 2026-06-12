@@ -5,6 +5,7 @@ import {
   getOuterscoreToken,
   clearOuterscoreToken,
 } from '~/utils/outerscoreToken';
+import { postToParent } from '~/utils/canvas';
 
 const PAGE_STORAGE_KEY = 'outerscore:page';
 const TOKEN_READY_EVENT = 'outerscore:token-ready';
@@ -20,15 +21,6 @@ export const isOuterscoreContext = (): boolean => {
     return !!sessionStorage.getItem(PAGE_STORAGE_KEY) || !!getOuterscoreToken();
   } catch {
     return !!getOuterscoreToken();
-  }
-};
-
-const postToParent = (message: { type: string; [key: string]: unknown }) => {
-  if (!isInIframe()) return;
-  try {
-    window.parent.postMessage(message, '*');
-  } catch {
-    /* ignore */
   }
 };
 

@@ -101,7 +101,6 @@ function ChatView({ index = 0 }: { index?: number }) {
                       isLandingPage && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
                     )}
                   >
-                    {isLandingPage && isEmbedded && <ConversationStarters />}
                     <ChatForm index={index} />
                     {isLandingPage ? (isEmbedded ? null : <ConversationStarters />) : <Footer />}
                   </div>

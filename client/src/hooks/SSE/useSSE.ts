@@ -19,6 +19,8 @@ import {
   isOnCanvasPage,
   markMessageAsCanvasDoc,
   parseComplianceEnvelope,
+  postToParent,
+  replaceTextParts,
   resolveCanvasRouting,
   stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
@@ -116,7 +118,7 @@ export default function useSSE(
       if (!canvasCapable) {
         return;
       }
-      window.parent.postMessage(message, '*');
+      postToParent(message);
     };
     const replaceLastAssistantText = (newText: string) => {
       const msgs = getMessages();
@@ -128,10 +130,11 @@ export default function useSSE(
       if (last.isCreatedByUser) {
         return;
       }
+      // Replace only the TEXT parts — reasoning/think parts stay visible in chat.
       const replaced: TMessage = {
         ...last,
         text: newText,
-        content: undefined,
+        content: replaceTextParts(last.content, newText),
       };
       const nextMessages = [...msgs.slice(0, lastIdx), replaced];
       setMessages(nextMessages);
@@ -147,7 +150,7 @@ export default function useSSE(
           }
           return [
             ...prev.slice(0, prev.length - 1),
-            { ...prevLast, text: newText, content: undefined },
+            { ...prevLast, text: newText, content: replaceTextParts(prevLast.content, newText) },
           ];
         });
       }
@@ -213,6 +216,7 @@ export default function useSSE(
         return;
       }
       rawText = currentText;
+      console.log('[canvas] forwardCanvasStream — intent:', canvasIntent, '| alwaysDocument:', alwaysDocument, '| textLen:', currentText.length);
       // 'always' routing: the host already decided this turn targets the
       // document, so route every reply to the canvas — no <document> envelope
       // required (works on any model). 'intent': the model decides via the tag.
@@ -220,6 +224,7 @@ export default function useSSE(
         canvasIntent = 'yes';
       } else if (canvasIntent === 'pending') {
         canvasIntent = detectCanvasIntent(currentText);
+        console.log('[canvas] intent detection result:', canvasIntent);
         // No <document> tag yet — it may still arrive (weak models preamble
         // first), so stay pending and post nothing to the canvas.
         if (canvasIntent !== 'yes') {
@@ -233,10 +238,12 @@ export default function useSSE(
       }
       if (!canvasStreamStarted) {
         canvasStreamStarted = true;
+        console.log('[canvas] stream started');
         postToCanvas({ type: 'outerscore:stream-start' });
       }
       const chunk = body.slice(sentDocBody.length);
       sentDocBody = body;
+      console.log('[canvas] stream-chunk — chunkLen:', chunk.length, '| totalSent:', body.length);
       postToCanvas({
         type: 'outerscore:stream-chunk',
         chunk,
@@ -246,8 +253,10 @@ export default function useSSE(
 
     sse.addEventListener('message', (e: MessageEvent) => {
       const data = JSON.parse(e.data);
+      console.log('[SSE] raw event:', data);
 
       if (data.final != null) {
+        console.log('[SSE] final event — rawText length:', rawText.length, '| canvasIntent:', canvasIntent, '| canvasCapable:', canvasCapable);
         clearAllDrafts(submission.conversation?.conversationId);
         try {
           finalHandler(data, submission as EventSubmission);
@@ -270,6 +279,7 @@ export default function useSSE(
           if (canvasIntent === 'yes') {
             const { findings } = parseComplianceEnvelope(rawText);
             const body = extractDocBody(rawText);
+            console.log('[SSE] canvas document body length:', body.length, '| compliance findings:', findings.length);
             // Never clobber the editor with an empty body — weak models can
             // return nothing usable; leave the chat reply in place instead.
             if (body.length > 0) {
@@ -280,9 +290,10 @@ export default function useSSE(
             }
           }
         }
-        console.log('final', data);
+        console.log('[SSE] final data:', data);
         return;
       } else if (data.created != null) {
+        console.log('[SSE] created event — messageId:', data.message?.messageId);
         const runId = v4();
         setActiveRunId(runId);
         userMessage = {
@@ -293,8 +304,10 @@ export default function useSSE(
 
         createdHandler(data, { ...submission, userMessage } as EventSubmission);
       } else if (data.event != null) {
+        console.log('[SSE] step event:', data.event);
         stepHandler(data, { ...submission, userMessage } as EventSubmission);
       } else if (data.sync != null) {
+        console.log('[SSE] sync event');
         const runId = v4();
         setActiveRunId(runId);
         /* synchronize messages to Assistants API as well as with real DB ID's */
@@ -304,11 +317,11 @@ export default function useSSE(
         if (text != null && index !== textIndex) {
           textIndex = index;
         }
-
+        console.log('[SSE] content event — type:', data.type, '| index:', index);
         contentHandler({ data, submission: submission as EventSubmission });
       } else {
         const text: string = data.text ?? data.response ?? '';
-
+        console.log('[SSE] message chunk — length:', text.length, '| has message:', data.message != null);
         const initialResponse = {
           ...(submission.initialResponse as TMessage),
           parentMessageId: data.parentMessageId,

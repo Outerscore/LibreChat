@@ -1,4 +1,5 @@
-import type { TMessage } from 'librechat-data-provider';
+import { ContentTypes } from 'librechat-data-provider';
+import type { TMessage, TMessageContentParts } from 'librechat-data-provider';
 
 const CANVAS_CONTEXT_KEY = 'outerscore:canvas-content';
 const CANVAS_PAGE_KEY = 'outerscore:page';
@@ -126,9 +127,15 @@ const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRout
   // 'intent' routing: the model decides per reply via the <document> envelope.
   return [
     ...context,
+    `The editor next to this chat is called the "canvas" — it holds the ${spec.artifact}. When the user says canvas, document, editor, or brief, they mean it.`,
+    '',
     "Decide how to respond based on the user's message:",
     '',
-    `1. If the user asks you to WRITE, DRAFT, REWRITE, UPDATE, TRANSLATE, SHORTEN, EXPAND or otherwise change the ${spec.artifact}, reply with the COMPLETE updated document and nothing before it. Begin your reply with the <document> tag:`,
+    '1. DOCUMENT WORK — choose this whenever the user wants content to end up in the canvas:',
+    `   - they ask you to WRITE, DRAFT, REWRITE, UPDATE, TRANSLATE, SHORTEN, EXPAND or otherwise change the ${spec.artifact};`,
+    '   - OR they ask for ANY content to be provided/put/written IN or ON the canvas, document, or editor (e.g. "provide a job description in the canvas", "write it to the document") — even when that content is not literally a revision of the current text;',
+    '   - OR they ask to move, copy, duplicate or "do the same" with an earlier chat answer in the canvas.',
+    '   Reply with the COMPLETE updated document and nothing before it. Begin your reply with the <document> tag:',
     '<document>',
     '...the full document in Markdown — no preamble, no commentary, no code fences...',
     '</document>',
@@ -136,7 +143,7 @@ const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRout
     complianceClause(spec.rules),
     'The <document> block followed by the <compliance> envelope is the ENTIRE reply — output nothing else.',
     '',
-    '2. Otherwise (a question, advice, brainstorming, or general chat), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> or <compliance> tags. You may refer to the document content above.',
+    '2. Otherwise (a question, advice, brainstorming, or general chat with no instruction to put anything in the canvas), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> or <compliance> tags. You may refer to the document content above. If you are unsure whether the user wanted the canvas updated, answer in chat and ask.',
   ].join('\n');
 };
 
@@ -344,19 +351,35 @@ export const stripCanvasEnvelopes = (text: string): string => {
 /**
  * Display decision for an assistant reply on a canvas page: mask it with the
  * "written to canvas" indicator, or render it as a normal chat bubble.
- *  - 'always': every reply is the document (and carries no marker) — mask all.
+ *
+ *  - A registry-recorded id (a turn that genuinely drove the canvas) is masked
+ *    in every mode, forever.
+ *  - Deployment-level 'always' (env lever, weak local models, user mode 'auto'):
+ *    every stored reply IS the document and carries no marker — mask them all.
+ *  - User-selected 'document' mode: mask only the in-flight turn (`isActiveTurn`,
+ *    it streams to the canvas and gets its id recorded on commit). Earlier turns
+ *    are judged on their own merits — flipping the toggle to Document must NOT
+ *    retroactively claim past chat answers were "written to canvas" (they weren't).
  *  - 'chat': nothing is forwarded, so a doc-shaped reply was NOT written to
- *    the canvas — never claim it was. Mask only turns that genuinely drove the
- *    canvas: a recorded id or the in-session placeholder text.
+ *    the canvas — never claim it was. Mask only the in-session placeholder.
  *  - 'intent': mask doc-shaped replies and recorded ids.
  */
-export const shouldMaskCanvasReply = (text: string, messageId?: string | null): boolean => {
-  const routing = resolveCanvasRouting();
-  if (routing === 'always') {
-    return true;
-  }
+export const shouldMaskCanvasReply = (
+  text: string,
+  messageId?: string | null,
+  isActiveTurn = false,
+): boolean => {
   if (isMessageCanvasDoc(messageId)) {
     return true;
+  }
+  const routing = resolveCanvasRouting();
+  if (routing === 'always') {
+    if (getCanvasMode() === 'auto') {
+      return true;
+    }
+    if (isActiveTurn) {
+      return true;
+    }
   }
   if (routing === 'chat') {
     return text.trim() === CANVAS_PLACEHOLDER_TEXT;
@@ -427,6 +450,32 @@ export const parseComplianceEnvelope = (
   return { findings, stripped };
 };
 
+/**
+ * Visible text of a single content part. Reasoning ('think') parts are NOT
+ * text — the canvas pipeline must never treat the model's thinking as document
+ * content. Text parts may carry either a plain string or the assistants-style
+ * `{ value: string }` object (resume/sync paths store the latter), so both
+ * shapes are unwrapped.
+ */
+export const extractPartText = (part: TMessageContentParts | string | undefined | null): string => {
+  if (!part) {
+    return '';
+  }
+  if (typeof part === 'string') {
+    return part;
+  }
+  if ('text' in part) {
+    const text = part.text;
+    if (typeof text === 'string') {
+      return text;
+    }
+    if (text && typeof text === 'object' && typeof text.value === 'string') {
+      return text.value;
+    }
+  }
+  return '';
+};
+
 /** Flatten a LibreChat message's text / content parts into a single string. */
 export const extractMessageText = (message: TMessage | undefined | null): string => {
   if (!message) {
@@ -437,20 +486,47 @@ export const extractMessageText = (message: TMessage | undefined | null): string
   }
   const content = message.content;
   if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (!part) {
-          return '';
-        }
-        if (typeof part === 'string') {
-          return part;
-        }
-        if ('text' in part && typeof part.text === 'string') {
-          return part.text;
-        }
-        return '';
-      })
-      .join('');
+    return content.map(extractPartText).join('');
   }
   return typeof message.text === 'string' ? message.text : '';
+};
+
+/**
+ * Replace a message's TEXT parts with a single text part holding `newText`,
+ * PRESERVING every non-text part (reasoning/think, tool calls). The SSE hooks
+ * use this when swapping a document reply for the canvas placeholder — the old
+ * `content: undefined` wipe also destroyed the model's thinking block, which
+ * should stay visible in the chat. Non-array content yields undefined so the
+ * message's `text` field remains the single source.
+ */
+export const replaceTextParts = (
+  content: TMessage['content'],
+  newText: string,
+): TMessage['content'] => {
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  const preserved = content.filter(
+    (part) => part != null && typeof part !== 'string' && part.type !== ContentTypes.TEXT,
+  );
+  return [...preserved, { type: ContentTypes.TEXT, text: newText } as TMessageContentParts];
+};
+
+/**
+ * Outbound channel to the embedding Outerscore host. The target origin is
+ * pinned to `VITE_OUTERSCORE_PARENT_ORIGIN` when configured (production —
+ * document content must not be readable by an arbitrary embedding page);
+ * '*' remains only as the unconfigured-dev fallback.
+ */
+const parentOrigin = (import.meta.env.VITE_OUTERSCORE_PARENT_ORIGIN as string | undefined) || '*';
+
+export const postToParent = (message: unknown): void => {
+  if (typeof window === 'undefined' || window.parent === window) {
+    return;
+  }
+  try {
+    window.parent.postMessage(message, parentOrigin);
+  } catch {
+    // Malformed origin / serialization failure — drop rather than break the stream path.
+  }
 };

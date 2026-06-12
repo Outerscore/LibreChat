@@ -1,12 +1,15 @@
+import type { TMessage } from 'librechat-data-provider';
 import {
   buildCanvasSystemPrompt,
   detectCanvasIntent,
   extractDocBody,
+  extractMessageText,
   getCanvasMode,
   isDocumentReplyText,
   isMessageCanvasDoc,
   markMessageAsCanvasDoc,
   parseComplianceEnvelope,
+  replaceTextParts,
   resolveCanvasRouting,
   setCanvasMode,
   shouldMaskCanvasReply,
@@ -103,9 +106,26 @@ describe('canvas — user mode & routing', () => {
       ).toBe(false);
     });
 
-    it("masks everything in 'document' (always) mode — doc replies carry no marker", () => {
+    it("does NOT retroactively mask earlier chat turns in 'document' mode", () => {
+      // Bug seen live: answering in chat under 'auto', then flipping the toggle
+      // to Document masked the past chat reply as "written to canvas" — false.
       setCanvasMode('document');
-      expect(shouldMaskCanvasReply('Untagged markdown that IS the document')).toBe(true);
+      expect(shouldMaskCanvasReply('Plain chat answer from an earlier auto-mode turn')).toBe(false);
+    });
+
+    it("masks the in-flight (active) turn in 'document' mode — it streams to the canvas", () => {
+      setCanvasMode('document');
+      expect(shouldMaskCanvasReply('Raw streaming markdown', undefined, true)).toBe(true);
+      // Once committed, the turn is masked via its recorded id / placeholder instead.
+      expect(shouldMaskCanvasReply(CANVAS_PLACEHOLDER_TEXT, undefined, false)).toBe(true);
+    });
+
+    it("masks a committed document turn in 'document' mode via its recorded id", () => {
+      setCanvasMode('document');
+      markMessageAsCanvasDoc('msg-doc-mode-1');
+      expect(shouldMaskCanvasReply('Untagged markdown that IS the document', 'msg-doc-mode-1')).toBe(
+        true,
+      );
     });
 
     it('keeps masking a marker-less doc reply after a mode switch via its recorded id', () => {
@@ -185,6 +205,16 @@ describe('canvas — user mode & routing', () => {
       const prompt = buildCanvasSystemPrompt();
       expect(prompt).toContain('COMPLETE updated');
       expect(prompt).not.toContain('Decide how to respond');
+    });
+
+    it("routes explicit canvas references to document work in 'auto' (intent) mode", () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      const prompt = buildCanvasSystemPrompt();
+      // "provide X in the canvas" and "move that chat answer to the canvas"
+      // must be treated as document work, not chat.
+      expect(prompt).toContain('IN or ON the canvas');
+      expect(prompt).toContain('earlier chat answer');
+      expect(prompt).toContain('called the "canvas"');
     });
   });
 });
@@ -291,6 +321,79 @@ describe('canvas — host-bound stream parsing', () => {
       const { findings, stripped } = parseComplianceEnvelope(text);
       expect(findings).toEqual([]);
       expect(stripped).toBe('Body');
+    });
+  });
+});
+
+describe('canvas — message text extraction & placeholder replacement', () => {
+  describe('extractMessageText', () => {
+    it('prefers the flat text field when present', () => {
+      const message = {
+        text: 'flat text',
+        content: [{ type: 'text', text: 'part text' }],
+      } as unknown as TMessage;
+      expect(extractMessageText(message)).toBe('flat text');
+    });
+
+    it('flattens string-shaped text parts', () => {
+      const message = {
+        text: '',
+        content: [
+          { type: 'text', text: 'Hello ' },
+          { type: 'text', text: 'world' },
+        ],
+      } as unknown as TMessage;
+      expect(extractMessageText(message)).toBe('Hello world');
+    });
+
+    it('unwraps object-shaped ({ value }) text parts (resume/sync paths)', () => {
+      const message = {
+        text: '',
+        content: [{ type: 'text', text: { value: 'from value' } }],
+      } as unknown as TMessage;
+      expect(extractMessageText(message)).toBe('from value');
+    });
+
+    it("skips reasoning parts — the model's thinking is never document content", () => {
+      const message = {
+        text: '',
+        content: [
+          { type: 'think', think: 'internal reasoning the host must never see' },
+          { type: 'text', text: '<document>Body</document>' },
+        ],
+      } as unknown as TMessage;
+      expect(extractMessageText(message)).toBe('<document>Body</document>');
+    });
+
+    it('returns an empty string for a missing message', () => {
+      expect(extractMessageText(null)).toBe('');
+      expect(extractMessageText(undefined)).toBe('');
+    });
+  });
+
+  describe('replaceTextParts', () => {
+    it('replaces text parts with a single placeholder part, preserving think parts', () => {
+      const content = [
+        { type: 'think', think: 'reasoning' },
+        { type: 'text', text: '<document>Body</document>' },
+      ] as unknown as TMessage['content'];
+      const replaced = replaceTextParts(content, CANVAS_PLACEHOLDER_TEXT) ?? [];
+      expect(replaced).toHaveLength(2);
+      expect(replaced[0]).toEqual({ type: 'think', think: 'reasoning' });
+      expect(replaced[1]).toEqual({ type: 'text', text: CANVAS_PLACEHOLDER_TEXT });
+    });
+
+    it('collapses multiple text parts into one replacement part', () => {
+      const content = [
+        { type: 'text', text: 'a' },
+        { type: 'text', text: 'b' },
+      ] as unknown as TMessage['content'];
+      const replaced = replaceTextParts(content, 'new') ?? [];
+      expect(replaced).toEqual([{ type: 'text', text: 'new' }]);
+    });
+
+    it('returns undefined for non-array content (text field stays the single source)', () => {
+      expect(replaceTextParts(undefined, 'new')).toBeUndefined();
     });
   });
 });

@@ -51,25 +51,16 @@ const outerscoreBridgeController = async (req, res) => {
 
   try {
     const email = claim.email.toLowerCase();
+    // The signed token's user id is the ONLY account key. There is deliberately
+    // no email-based fallback: an email is an attacker-influenceable value, and
+    // looking accounts up by it allowed a token for identity A to capture (and
+    // re-bind) an existing account owned by identity B. If a legacy account
+    // already holds this email, createUser below fails on the unique index —
+    // a loud, safe collision an admin resolves manually, never an auto-merge.
     let user = await findUser({ outerscoreId: claim.id });
-    if (!user) {
-      user = await findUser({ email });
-    }
-
-    if (user && user.provider && user.provider !== 'outerscore' && user.provider !== 'local') {
-      logger.warn(
-        `[outerscore] user ${email} registered with provider "${user.provider}"; overriding to outerscore`,
-      );
-    }
 
     if (user) {
       const patch = {};
-      if (user.outerscoreId !== claim.id) {
-        patch.outerscoreId = claim.id;
-      }
-      if (user.provider !== 'outerscore') {
-        patch.provider = 'outerscore';
-      }
       const expectedName = [claim.firstName, claim.lastName].filter(Boolean).join(' ').trim();
       if (expectedName && user.name !== expectedName) {
         patch.name = expectedName;

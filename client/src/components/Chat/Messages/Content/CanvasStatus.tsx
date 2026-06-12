@@ -1,7 +1,9 @@
 import type { TMessageContentParts } from 'librechat-data-provider';
 import {
   extractDocBody,
+  extractPartText,
   isOnCanvasPage,
+  postToParent,
   resolveCanvasRouting,
   shouldMaskCanvasReply,
   CANVAS_PLACEHOLDER_TEXT,
@@ -12,24 +14,12 @@ import Container from './Container';
 /** Alias of {@link isOnCanvasPage}; the canvas-page allow-list lives in utils/canvas. */
 export const isCanvas2Mode = (): boolean => isOnCanvasPage();
 
+/** Visible text of the content parts — reasoning/think parts excluded (shared extractor). */
 export const extractPartsText = (content?: Array<TMessageContentParts | undefined>): string => {
   if (!Array.isArray(content)) {
     return '';
   }
-  return content
-    .map((part) => {
-      if (part == null) {
-        return '';
-      }
-      if (typeof part === 'string') {
-        return part;
-      }
-      if ('text' in part && typeof part.text === 'string') {
-        return part.text;
-      }
-      return '';
-    })
-    .join('');
+  return content.map(extractPartText).join('');
 };
 
 /**
@@ -61,7 +51,7 @@ export const postCanvasContent = (
   if (!text) {
     return;
   }
-  window.parent.postMessage({ type: 'outerscore:content', html: text, initial }, '*');
+  postToParent({ type: 'outerscore:content', html: text, initial });
 };
 
 export const CanvasWritingIndicator = () => {

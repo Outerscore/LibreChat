@@ -174,9 +174,22 @@ const MessageContent = ({
   // Canvas page: mask only replies that are document work (routing-aware) — a
   // chat-mode or intent-routed Q&A reply renders as a normal bubble. A doc turn
   // streaming under 'intent' flips to the indicator once its <document> tag lands.
-  if (!message.isCreatedByUser && isCanvas2Mode() && shouldMaskCanvasReply(text, messageId)) {
+  // Thinking content is NOT masked — only the document text is replaced by the
+  // indicator, the model's thoughts stay readable in the chat.
+  if (
+    !message.isCreatedByUser &&
+    isCanvas2Mode() &&
+    shouldMaskCanvasReply(text, messageId, isLast === true && isSubmitting === true)
+  ) {
     const inFlight = isSubmitting || (isLast && regularContent.length === 0);
-    return inFlight ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />;
+    return (
+      <>
+        {thinkingContent.length > 0 && (
+          <Thinking key={`thinking-${messageId}`}>{thinkingContent}</Thinking>
+        )}
+        {inFlight ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />}
+      </>
+    );
   }
 
   return (
