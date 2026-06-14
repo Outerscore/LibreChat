@@ -14,8 +14,8 @@ import { initializeFontSize } from '~/store/fontSize';
 import { LiveAnnouncer } from '~/a11y';
 import { router } from './routes';
 
-/** Follows the Outerscore host language while embedded (needs Recoil context). */
-const OuterscoreLanguageBridge = () => {
+/** Host-driven bridges while embedded: language sync. */
+const OuterscoreBridges = () => {
   useOuterscoreLanguageBridge();
   return null;
 };
@@ -68,7 +68,7 @@ const App = () => {
               <ToastProvider>
                 <DndProvider backend={HTML5Backend}>
                   <RouterProvider router={router} />
-                  <OuterscoreLanguageBridge />
+                  <OuterscoreBridges />
                   <WakeLockManager />
                   <Toast />
                   <RadixToast.Viewport className="pointer-events-none fixed inset-0 z-[1000] mx-auto my-2 flex max-w-[560px] flex-col items-stretch justify-start md:pb-5" />

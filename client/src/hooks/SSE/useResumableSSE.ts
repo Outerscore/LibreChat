@@ -31,6 +31,7 @@ import {
   detectCanvasIntent,
   extractDocBody,
   extractMessageText,
+  isComplianceOnlyReply,
   isOnCanvasPage,
   markMessageAsCanvasDoc,
   parseComplianceEnvelope,
@@ -39,6 +40,7 @@ import {
   resolveCanvasRouting,
   stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
+  COMPLIANCE_SUMMARY_TEXT,
 } from '~/utils/canvas';
 import store from '~/store';
 
@@ -315,6 +317,23 @@ export default function useResumableSSE(
                   replaceLastAssistantWithCanvasPlaceholder();
                   postToCanvas({ type: 'outerscore:canvas-complete' });
                 }
+              }
+            }
+            // Audit reply (a <compliance> envelope, no <document>): route findings
+            // to the host panel and strip the envelope from the chat bubble. Runs
+            // on any canvas page regardless of the chat/document toggle — findings
+            // are not a canvas write — but NOT in always-mode, where the whole
+            // reply IS the document (handled above). Read the message directly:
+            // rawText is only populated when shouldPostToCanvas is true.
+            if (isInIframe && isOnCanvasPage() && !alwaysDocument) {
+              const msgs = getMessages() ?? [];
+              const last = msgs[msgs.length - 1];
+              const replyText = last && !last.isCreatedByUser ? extractMessageText(last) : '';
+              if (isComplianceOnlyReply(replyText)) {
+                const { findings } = parseComplianceEnvelope(replyText);
+                postToParent({ type: 'outerscore:compliance-result', findings });
+                const stripped = stripCanvasEnvelopes(replyText);
+                replaceLastAssistantText(stripped || COMPLIANCE_SUMMARY_TEXT);
               }
             }
             sse.close();

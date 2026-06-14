@@ -26,6 +26,7 @@ const {
 const { connectDb, indexSync } = require('~/db');
 const initializeOAuthReconnectManager = require('./services/initializeOAuthReconnectManager');
 const { getRoleByName, updateAccessPermissions, seedDatabase } = require('~/models');
+const { seedComplianceAgents } = require('./services/Outerscore/complianceAgents');
 const { capabilityContextMiddleware } = require('./middleware/roles/capabilities');
 const createValidateImageRequest = require('./middleware/validateImageRequest');
 const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
@@ -69,6 +70,7 @@ const startServer = async () => {
   }
 
   await runAsSystem(seedDatabase);
+  await runAsSystem(seedComplianceAgents);
   const appConfig = await getAppConfig({ baseOnly: true });
   initializeFileStorage(appConfig);
   await runAsSystem(async () => {

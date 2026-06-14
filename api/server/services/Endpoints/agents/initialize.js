@@ -447,6 +447,9 @@ const initializeClient = async ({ req, res, signal, endpointOption }) => {
     agent: primaryConfig,
     spec: endpointOption.spec,
     iconURL: endpointOption.iconURL,
+    // Outerscore: invisible per-request context (e.g. the live canvas document)
+    // folded into the primary agent's instructions by the client.
+    promptPrefix: endpointOption.promptPrefix,
     attachments: primaryConfig.attachments,
     endpointType: endpointOption.endpointType,
     resendFiles: primaryConfig.resendFiles ?? true,

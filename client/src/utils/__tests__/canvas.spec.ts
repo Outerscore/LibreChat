@@ -4,6 +4,7 @@ import {
   detectCanvasIntent,
   extractDocBody,
   extractMessageText,
+  isComplianceOnlyReply,
   getCanvasMode,
   isDocumentReplyText,
   isMessageCanvasDoc,
@@ -216,6 +217,53 @@ describe('canvas — user mode & routing', () => {
       expect(prompt).toContain('earlier chat answer');
       expect(prompt).toContain('called the "canvas"');
     });
+
+    it("offers an AUDIT branch (check/review only, not change) in 'auto' mode", () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('AUDIT');
+      expect(prompt).toContain('does NOT ask you to change');
+      expect(prompt).toContain('<compliance>');
+    });
+
+    it("lists change verbs (correct/fix/add) under DOCUMENT WORK so they aren't audited", () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('CORRECT');
+      expect(prompt).toContain('ADD TO');
+      // The disambiguation rule must steer change requests to DOCUMENT WORK.
+      expect(prompt).toContain('choose DOCUMENT WORK');
+    });
+
+    it('injects document context only (no rules/intent) when an agent is active', () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      const prompt = buildCanvasSystemPrompt(true);
+      // The selected agent owns its own rules — we must not duplicate them.
+      expect(prompt).toContain('the live SOW Project Brief');
+      expect(prompt).not.toContain('Decide how to respond');
+      expect(prompt).not.toContain('<document>');
+      expect(prompt).not.toContain('compliance envelope');
+    });
+  });
+});
+
+describe('canvas — isComplianceOnlyReply', () => {
+  it('is true for a reply that is only a compliance envelope', () => {
+    expect(isComplianceOnlyReply('<compliance>{"findings":[]}</compliance>')).toBe(true);
+    expect(
+      isComplianceOnlyReply('Here is the review:\n<compliance>{"findings":[]}</compliance>'),
+    ).toBe(true);
+  });
+
+  it('is false when the reply also contains a <document> (that is document work)', () => {
+    expect(
+      isComplianceOnlyReply('<document>Body</document><compliance>{"findings":[]}</compliance>'),
+    ).toBe(false);
+  });
+
+  it('is false for a plain chat reply or empty text', () => {
+    expect(isComplianceOnlyReply('A fair day rate depends on…')).toBe(false);
+    expect(isComplianceOnlyReply('')).toBe(false);
   });
 });
 

@@ -16,6 +16,7 @@ import {
   detectCanvasIntent,
   extractDocBody,
   extractMessageText,
+  isComplianceOnlyReply,
   isOnCanvasPage,
   markMessageAsCanvasDoc,
   parseComplianceEnvelope,
@@ -24,6 +25,7 @@ import {
   resolveCanvasRouting,
   stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
+  COMPLIANCE_SUMMARY_TEXT,
 } from '~/utils/canvas';
 import store from '~/store';
 
@@ -279,7 +281,6 @@ export default function useSSE(
           if (canvasIntent === 'yes') {
             const { findings } = parseComplianceEnvelope(rawText);
             const body = extractDocBody(rawText);
-            console.log('[SSE] canvas document body length:', body.length, '| compliance findings:', findings.length);
             // Never clobber the editor with an empty body — weak models can
             // return nothing usable; leave the chat reply in place instead.
             if (body.length > 0) {
@@ -290,7 +291,21 @@ export default function useSSE(
             }
           }
         }
-        console.log('[SSE] final data:', data);
+        // Audit reply (a <compliance> envelope, no <document>): route findings to
+        // the host panel and strip the envelope from the chat bubble. Runs on any
+        // canvas page regardless of the chat/document toggle, but NOT in always-mode
+        // (where the whole reply is the document, handled above).
+        if (isInIframe && isOnCanvasPage() && !alwaysDocument) {
+          const msgs = getMessages() ?? [];
+          const last = msgs[msgs.length - 1];
+          const replyText = last && !last.isCreatedByUser ? extractMessageText(last) : '';
+          if (isComplianceOnlyReply(replyText)) {
+            const { findings } = parseComplianceEnvelope(replyText);
+            postToParent({ type: 'outerscore:compliance-result', findings });
+            const stripped = stripCanvasEnvelopes(replyText);
+            replaceLastAssistantText(stripped || COMPLIANCE_SUMMARY_TEXT);
+          }
+        }
         return;
       } else if (data.created != null) {
         console.log('[SSE] created event — messageId:', data.message?.messageId);

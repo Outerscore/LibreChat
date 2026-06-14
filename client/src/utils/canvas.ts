@@ -91,7 +91,12 @@ const complianceClause = (rules: string[]): string =>
  * Returned as *system* instructions so the document + rules never appear in the
  * visible user message.
  */
-const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRouting): string => {
+const buildSpecPrompt = (
+  spec: CanvasSpec,
+  document: string,
+  routing: CanvasRouting,
+  agentActive = false,
+): string => {
   const trimmed = document.trim();
   const context = [
     `You are an assistant embedded next to a ${spec.artifact} editor on the Outerscore procurement platform.`,
@@ -100,6 +105,18 @@ const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRout
       : `The ${spec.artifact} is currently empty.`,
     '',
   ];
+
+  // A dedicated agent is active (e.g. a compliance agent selected in the picker):
+  // it owns its own instructions/rules, so inject ONLY the current document as
+  // context — never our rules/intent/envelope, which would duplicate or fight the
+  // agent's own prompt. The agent's reply (a <compliance> envelope or a document)
+  // is still parsed by the SSE hooks.
+  if (agentActive) {
+    return [
+      ...context,
+      `The text above is the live ${spec.artifact} the user is working on; use it as the document to act on.`,
+    ].join('\n');
+  }
 
   // 'chat' routing: the user pinned the toggle to chat-only — answer normally,
   // never produce a document. The SSE hooks also drop any canvas forwarding in
@@ -131,9 +148,9 @@ const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRout
     '',
     "Decide how to respond based on the user's message:",
     '',
-    '1. DOCUMENT WORK — choose this whenever the user wants content to end up in the canvas:',
-    `   - they ask you to WRITE, DRAFT, REWRITE, UPDATE, TRANSLATE, SHORTEN, EXPAND or otherwise change the ${spec.artifact};`,
-    '   - OR they ask for ANY content to be provided/put/written IN or ON the canvas, document, or editor (e.g. "provide a job description in the canvas", "write it to the document") — even when that content is not literally a revision of the current text;',
+    '1. DOCUMENT WORK — choose this whenever the user wants to CHANGE or ADD to the content. This is the default for any instruction that modifies the document:',
+    `   - they ask you to WRITE, DRAFT, REWRITE, UPDATE, EDIT, CORRECT, FIX, IMPROVE, POLISH, ADD TO, EXTEND, TRANSLATE, SHORTEN, EXPAND or otherwise change the ${spec.artifact};`,
+    '   - OR they ask for ANY content to be provided/put/written IN or ON the canvas, document, or editor (e.g. "provide a job description in the canvas", "write it to the document", "add more requirements in canvas") — even when that content is not literally a revision of the current text;',
     '   - OR they ask to move, copy, duplicate or "do the same" with an earlier chat answer in the canvas.',
     '   Reply with the COMPLETE updated document and nothing before it. Begin your reply with the <document> tag:',
     '<document>',
@@ -143,7 +160,11 @@ const buildSpecPrompt = (spec: CanvasSpec, document: string, routing: CanvasRout
     complianceClause(spec.rules),
     'The <document> block followed by the <compliance> envelope is the ENTIRE reply — output nothing else.',
     '',
-    '2. Otherwise (a question, advice, brainstorming, or general chat with no instruction to put anything in the canvas), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> or <compliance> tags. You may refer to the document content above. If you are unsure whether the user wanted the canvas updated, answer in chat and ask.',
+    `2. AUDIT — choose this ONLY when the user asks you to CHECK, REVIEW, VALIDATE or "run/check compliance" on the ${spec.artifact} and does NOT ask you to change, correct, add to, or improve it. If the message contains ANY instruction to modify the document (correct, fix, add, rewrite, improve, etc.), it is DOCUMENT WORK (option 1), NOT an audit — when in doubt between auditing and changing, choose DOCUMENT WORK. Do NOT rewrite the document. Reply with ONLY the compliance envelope and nothing else:`,
+    complianceClause(spec.rules),
+    'Output the <compliance> envelope as the ENTIRE reply — no <document>, no preamble, no commentary.',
+    '',
+    '3. Otherwise (a question, advice, brainstorming, or general chat with no instruction to change or check the canvas), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> or <compliance> tags. You may refer to the document content above. If you are unsure whether the user wanted the canvas updated, answer in chat and ask.',
   ].join('\n');
 };
 
@@ -189,7 +210,7 @@ const SPEC_BY_PAGE: Record<string, CanvasSpec> = {
  * when not on a canvas page, so callers can inject it unconditionally. Injected
  * as `promptPrefix` so the document + instructions stay out of the chat thread.
  */
-export const buildCanvasSystemPrompt = (): string => {
+export const buildCanvasSystemPrompt = (agentActive = false): string => {
   let page = '';
   let canvas = '';
   try {
@@ -202,7 +223,7 @@ export const buildCanvasSystemPrompt = (): string => {
     return '';
   }
   const spec = SPEC_BY_PAGE[page] ?? GENERIC_SPEC;
-  return buildSpecPrompt(spec, canvas, resolveCanvasRouting());
+  return buildSpecPrompt(spec, canvas, resolveCanvasRouting(), agentActive);
 };
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -248,6 +269,8 @@ const SUGGESTION_MAX_LEN = 600;
 const COMPLIANCE_ENVELOPE = /<compliance>([\s\S]*?)<\/compliance>/;
 const DOC_OPEN = '<document>';
 const DOC_CLOSE = '</document>';
+/** Opening tag only (no `>`), so a partial/streaming envelope is still recognized. */
+const COMPLIANCE_OPEN = '<compliance';
 const SEVERITIES = new Set(['HIGH', 'MODERATE', 'LOW']);
 
 /** True when the fork treats every canvas-page reply as the document (weak models). */
@@ -268,6 +291,23 @@ export const detectCanvasIntent = (text: string): CanvasIntent => {
 };
 
 /**
+ * True when a reply is an "audit": it carries a `<compliance>` envelope but no
+ * `<document>` body. This is what a compliance check (the compliance agent, or an
+ * AUDIT-intent reply from the default model) produces — findings only, nothing to
+ * write to the editor. The SSE hooks route these to the findings panel and strip
+ * the envelope from the chat bubble instead of treating it as document work.
+ */
+export const isComplianceOnlyReply = (text: string): boolean => {
+  if (!text || text.includes(DOC_OPEN)) {
+    return false;
+  }
+  return COMPLIANCE_ENVELOPE.test(text);
+};
+
+/** Short bubble shown in the chat after an audit (findings live in the host panel). */
+export const COMPLIANCE_SUMMARY_TEXT = 'Compliance review complete — see the results panel.';
+
+/**
  * True when an assistant reply's text is document work: the in-session canvas
  * placeholder, an explicit `<document>` tag, or a `<compliance>` envelope
  * (always-mode doc replies carry no `<document>` tag but do carry the envelope).
@@ -280,7 +320,9 @@ export const isDocumentReplyText = (text: string): boolean => {
   return (
     trimmed === CANVAS_PLACEHOLDER_TEXT ||
     trimmed.includes(DOC_OPEN) ||
-    COMPLIANCE_ENVELOPE.test(trimmed)
+    // Opening tag (not the full envelope) so a STREAMING audit reply is masked with
+    // the generation loader immediately, instead of showing raw JSON until it closes.
+    trimmed.includes(COMPLIANCE_OPEN)
   );
 };
 

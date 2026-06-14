@@ -219,3 +219,30 @@ body {
     border-bottom-right-radius: 12px;
   }
 }
+
+/* Match the Outerscore app's global thin scrollbar exactly (frontend
+   styles.scss): thin, 6px, gray-300 thumb / gray-400 hover, 3px radius,
+   transparent track. Uses the mirrored `--os-color-*` tokens so it tracks the
+   live host palette / cosmic-classic switch. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--os-color-gray-300) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--os-color-gray-300);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--os-color-gray-400);
+}

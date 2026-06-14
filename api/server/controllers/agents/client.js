@@ -198,18 +198,28 @@ class AgentClient extends BaseClient {
      * Extract base instructions for all agents (combines instructions + additional_instructions).
      * This must be done before applying context to preserve the original agent configuration.
      */
-    const extractBaseInstructions = (agent) => {
+    /**
+     * Outerscore: invisible per-request context (the live canvas document, sent
+     * via promptPrefix) — folded into the PRIMARY agent's instructions only, so a
+     * selected compliance agent audits the actual document without it appearing in
+     * the visible chat. Sub-agents do not receive it.
+     */
+    const outerscoreContext = (this.options.promptPrefix ?? '').trim();
+    const extractBaseInstructions = (agent, includeContext = false) => {
       const baseInstructions = [agent.instructions ?? '', agent.additional_instructions ?? '']
         .filter(Boolean)
         .join('\n')
         .trim();
-      agent.instructions = baseInstructions;
+      agent.instructions =
+        includeContext && outerscoreContext
+          ? [baseInstructions, outerscoreContext].filter(Boolean).join('\n\n')
+          : baseInstructions;
       return agent;
     };
 
     /** Collect all agents for unified processing, extracting base instructions during collection */
     const allAgents = [
-      { agent: extractBaseInstructions(this.options.agent), agentId: this.options.agent.id },
+      { agent: extractBaseInstructions(this.options.agent, true), agentId: this.options.agent.id },
       ...(this.agentConfigs?.size > 0
         ? Array.from(this.agentConfigs.entries()).map(([agentId, agent]) => ({
             agent: extractBaseInstructions(agent),
