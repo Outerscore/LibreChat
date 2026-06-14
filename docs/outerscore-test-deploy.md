@@ -1,65 +1,112 @@
 # Deploying the Outerscore LibreChat fork to TEST
 
-Runbook for the `Deploy LibreChat to Test` GitHub Action
-(`.github/workflows/deploy-test.yml`). The chat is served under the **subpath**
-`https://test.outerscore.com/ai/chat` (same-origin with the Buyer app) and embedded
-as an iframe by the Angular Buyer app. Images are built in CI and published to
-**GitHub Container Registry (GHCR)** — no AWS is involved for the test environment.
+This is the complete, step-by-step guide to running the AI chat (LibreChat fork) on the
+**test** environment at **`https://test.outerscore.com/ai/chat`**.
 
-```
-Browser ──HTTPS──> test.outerscore.com (existing Apache/Nginx on the test box)
-  ├─ /            → Angular Buyer SPA        [unchanged]
-  ├─ /api/*       → Spring buyer-service     [unchanged]
-  └─ /ai/chat/*   → 127.0.0.1:3080 (strips /ai/chat)  → Compose stack below
-                        api (Node+FE)  ·  mongodb  ·  meilisearch
-```
-
-The frontend is built **into** the Node image (Express serves `client/dist`), so
-"Node + FE" is one container; only Mongo + Meilisearch are separate.
+> **Read this first — who does what.** The work happens in three different "places". You can do
+> all the **GitHub (browser)** steps yourself; the two **test-server** steps need someone with
+> SSH access to the box that runs `test.outerscore.com` (your devops / whoever set up test).
+> Each step below is tagged with **WHERE** it runs. A copy-paste summary for the server person
+> is in [§9](#9-hand-off-for-the-server-admin).
+>
+> For how login/SSO works once it's deployed, see [`outerscore-auth.md`](./outerscore-auth.md).
 
 ---
 
-## One-time setup
+## 1. What gets deployed
 
-### 1. Test host (`/opt/librechat`)
+LibreChat's frontend is built **into** its Node image, so the app is **one container** (Node +
+web UI) plus two small data containers. Nothing here touches the existing Outerscore apps.
 
-Requires `docker` and `docker compose` only (no AWS CLI). Run as the deploy user
-(reuse the existing Outerscore dev/staging SSH user):
-
-```bash
-sudo mkdir -p /opt/librechat/{images,uploads,logs}
-sudo chown -R "$(id -u)":"$(id -g)" /opt/librechat
-# The api image runs as uid/gid 1000 (the "node" user); bind-mounted dirs must be writable by it:
-sudo chown -R 1000:1000 /opt/librechat/{images,uploads,logs}
-# Ensure the deploy user is in the docker group. The workflow handles `docker login ghcr.io`.
+```
+Browser ──HTTPS──> test.outerscore.com   (existing Apache/Nginx on the test box)
+  ├─ /            → Angular Buyer SPA            [unchanged]
+  ├─ /api/*       → Spring buyer-service         [unchanged]
+  └─ /ai/chat/*   → 127.0.0.1:3080  (new proxy rule, strips /ai/chat)
+                        │
+                   ┌────┴───────────────┬──────────────────┐
+                 api (Node + web UI)   mongodb            meilisearch
+                 localhost-only        internal only       internal only
 ```
 
-### 2. Reverse-proxy route (host vhost for `test.outerscore.com`)
+- **Image:** built in GitHub Actions, published to **GHCR** (`ghcr.io/<owner>/librechat-test`).
+  No AWS is used for test.
+- **Data:** MongoDB + Meilisearch run as containers with **named volumes** that survive redeploys.
+- **URL:** served under the subpath `/ai/chat` on the existing domain (same-origin with the
+  Buyer app), so it reuses the existing TLS certificate.
 
-Add **one** block to the existing `test.outerscore.com` server config. The trailing
-slash on the upstream **strips** `/ai/chat`, so Express sees `/api/...`, `/assets/...`,
-`/health`. The CSP is **required** — the app ships no frame protection of its own.
+---
 
-**nginx**
+## 2. The three "places"
+
+| Place | What happens there | Who |
+|---|---|---|
+| **GitHub** (website, in your browser) | add secrets, create the `test` environment, merge code | **You** |
+| **Test server** (the Linux box behind `test.outerscore.com`) | one-time host prep + the `/ai/chat` proxy rule ([§4A](#4a-on-the-test-server)) | **Devops / server-admin** |
+| **Automatic** (GitHub Actions) | building the image + deploying it to the server | **Nobody** — runs on merge to `dev` |
+
+---
+
+## 3. How a deploy is triggered
+
+The workflow is `.github/workflows/deploy-test.yml`.
+
+- **Automatic:** every merge to the **`dev`** branch builds and redeploys test. This is the normal path.
+- **Manual:** GitHub → **Actions** → **Deploy LibreChat to Test** → **Run workflow** → pick any branch.
+
+> For these to work, `deploy-test.yml` must be on the **default branch** (so the button appears)
+> and on **`dev`** (so merges trigger it); `docker-compose.test.yml` and `librechat.test.yaml`
+> must exist on whatever branch is deployed. (Done once you merge this branch into `dev`.)
+
+---
+
+## 4. One-time setup
+
+Do these once. After that, deploys are automatic on merge to `dev`.
+
+### 4A. On the test server
+**WHERE: the test server (SSH) · WHO: devops/server-admin.** See [§9](#9-hand-off-for-the-server-admin)
+for a self-contained version to hand off.
+
+**(i) Create the deploy folder.** The deploy uploads files into `/opt/librechat` and writes the
+`.env` there, so it must exist and be writable by the SSH user used for deploys:
+```bash
+sudo install -d -o "$USER" /opt/librechat
+mkdir -p /opt/librechat/{images,uploads,logs}
+# The container runs as uid/gid 1000 (the "node" user); make the bind-mounted dirs writable by it:
+sudo chown -R 1000:1000 /opt/librechat/{images,uploads,logs}
+```
+
+**(ii) Prerequisites on the box:** `docker` + the `docker compose` plugin installed; the deploy
+SSH user is in the `docker` group; TCP **3080 free on `127.0.0.1`** (the app binds to loopback
+only; the reverse proxy reaches it there). No AWS CLI is needed.
+
+**(iii) Add the `/ai/chat` reverse-proxy rule** to the existing `test.outerscore.com` server
+config. The trailing slash on the upstream **strips** `/ai/chat`, so the app sees `/api/...`,
+`/assets/...`, `/health`. The `Content-Security-Policy` line is **required** — it allows the
+Buyer app to embed the chat in an iframe and blocks everyone else (the app has no built-in
+frame protection).
+
+If the box uses **nginx**:
 ```nginx
 location = /ai/chat { return 308 /ai/chat/; }
 location /ai/chat/ {
     proxy_pass http://127.0.0.1:3080/;          # trailing "/" strips /ai/chat
     proxy_http_version 1.1;
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Connection        "";       # SSE streaming
-    proxy_buffering    off;
-    proxy_cache        off;
+    proxy_set_header Connection "";             # keep streaming (SSE) responses open
+    proxy_buffering off;
+    proxy_cache off;
     proxy_read_timeout 3600s;
     client_max_body_size 25m;
     add_header Content-Security-Policy "frame-ancestors 'self'" always;
 }
 ```
 
-**Apache**
+If the box uses **Apache**:
 ```apache
 RewriteEngine On
 RewriteRule ^/ai/chat$ /ai/chat/ [R=308,L]
@@ -70,122 +117,192 @@ RewriteRule ^/ai/chat$ /ai/chat/ [R=308,L]
     Header always set Content-Security-Policy "frame-ancestors 'self'"
 </Location>
 ```
+Reload the web server after editing (`sudo nginx -t && sudo systemctl reload nginx`, or
+`sudo apachectl configtest && sudo systemctl reload apache2`).
 
-### 3. GitHub `test` Environment + secrets
+### 4B. The GitHub `test` environment + secrets
+**WHERE: github.com (repo Settings) · WHO: you.**
 
-Create a repository **Environment** named `test` and add:
+Repo → **Settings → Environments → New environment** → name it **`test`**. Add these secrets
+(**Add secret**):
 
-| Secret | Purpose |
+| Secret | What it is |
 |---|---|
-| `LIBRECHAT_TEST_ENV` | The full `.env` (see template below) |
-| `SSH_HOST`, `SSH_USER`, `SSH_KEY` | The self-hosted test host (reuse Outerscore's) |
+| `LIBRECHAT_TEST_ENV` | the full `.env` contents (built in [§4C](#4c-the-env-secret-value)) |
+| `SSH_HOST` | the test server's address |
+| `SSH_USER` | the deploy username on that server |
+| `SSH_KEY` | the deploy SSH **private** key |
 
-**Protection vs. automation:** the workflow **auto-deploys on every merge to `dev`**, so do
-**not** enable *required reviewers* on this environment — that would pause every merge for
-manual approval. Trust the auto path via **branch protection on `dev`** (PR review before
-merge). To stop an arbitrary branch from being manually dispatched to read these secrets, set
-the environment's **Deployment branches** policy to `dev` only — note that also limits manual
-any-branch deploys to whitelisted branches (pick the trade-off you want).
+(The `SSH_*` values are the same ones Outerscore already uses for its dev/staging deploys — ask
+your devops person. No registry secret is needed: the image push/pull uses GitHub's built-in
+token.)
 
-> No registry secret is needed: the build job pushes to GHCR and the host pulls using
-> the run's built-in `GITHUB_TOKEN` (workflow has `packages: write`). The package is
-> created private and linked to this repo; if a pull ever 403s, confirm the package is
-> linked to the repo under **Packages → Package settings**.
-> The SSH key secret must be named `SSH_KEY` (some Outerscore repos use `SSH_key`).
+**Important — do NOT enable "Required reviewers" on this environment.** That would pause every
+merge to `dev` for manual approval and defeat auto-deploy. Instead protect the auto path by
+enabling **branch protection / required PR review on `dev`** (repo → Settings → Branches). If you
+also want to stop someone manually deploying an arbitrary branch and reading these secrets, set
+the environment's **Deployment branches** policy to `dev` only (note: that also limits manual
+deploys to `dev`).
 
-### 4. `LIBRECHAT_TEST_ENV` template
+### 4C. The `.env` secret value
+**WHERE: your machine (terminal) and the browser · WHO: you.**
 
-Generate the secrets once, then paste the whole block into the `LIBRECHAT_TEST_ENV`
-secret. `LIBRECHAT_IMAGE` is appended automatically by the deploy job — do not set it.
-
+First generate fresh random secrets — **do not reuse** the values from the repo's example `.env`,
+they're publicly known:
 ```bash
-echo "JWT_SECRET=$(openssl rand -hex 32)"
-echo "JWT_REFRESH_SECRET=$(openssl rand -hex 32)"
-echo "CREDS_KEY=$(openssl rand -hex 32)"     # 64 hex chars
-echo "CREDS_IV=$(openssl rand -hex 16)"      # 32 hex chars
-echo "MEILI_MASTER_KEY=$(openssl rand -hex 32)"
+for k in JWT_SECRET JWT_REFRESH_SECRET CREDS_KEY MEILI_MASTER_KEY; do
+  echo "$k=$(openssl rand -hex 32)"
+done
+echo "CREDS_IV=$(openssl rand -hex 16)"
 ```
+> No `openssl`? On any machine with Node: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` (use 16 bytes for `CREDS_IV`).
 
+Then paste this whole block as the value of the `LIBRECHAT_TEST_ENV` secret, filling in the
+generated values, your Claude key, and the token-key URL from [§4D](#4d-confirm-with-the-backend-team):
 ```dotenv
-# --- subpath / URLs (same-origin with the Buyer app) ---
 DOMAIN_CLIENT=https://test.outerscore.com/ai/chat
 DOMAIN_SERVER=https://test.outerscore.com/ai/chat
 
-# --- secrets (generated above) ---
-JWT_SECRET=...
-JWT_REFRESH_SECRET=...
-CREDS_KEY=...
-CREDS_IV=...
-MEILI_MASTER_KEY=...
+JWT_SECRET=<generated>
+JWT_REFRESH_SECRET=<generated>
+CREDS_KEY=<generated 64 hex>
+CREDS_IV=<generated 32 hex>
+MEILI_MASTER_KEY=<generated>
 
-# --- LLM ---
 ANTHROPIC_API_KEY=sk-ant-...
 
-# --- Outerscore SSO bridge ---
-OUTERSCORE_TOKEN_KEY_URL=https://test.outerscore.com/api/oauth/token_key   # confirm exact path with BE
+OUTERSCORE_TOKEN_KEY_URL=https://test.outerscore.com/api/oauth/token_key
 OUTERSCORE_JWT_ISSUER=
 OUTERSCORE_JWT_AUDIENCE=
 ```
 
-> `HOST`, `PORT`, `NODE_ENV`, `MONGO_URI`, `MEILI_HOST`, `NO_INDEX`, `TRUST_PROXY`,
-> `OUTERSCORE_SSO_ENABLED`, and the `ALLOW_*` toggles are pinned in
-> `docker-compose.test.yml` and intentionally **not** in `.env`.
-> Model selection (Claude only) lives in `librechat.test.yaml` (tracked; the local
-> `librechat.yaml` is gitignored). It is mounted into the container as `/app/librechat.yaml`.
+Notes:
+- Everything else (`HOST`, `PORT`, `MONGO_URI`, `MEILI_HOST`, `NO_INDEX`, `TRUST_PROXY`,
+  registration toggles, `OUTERSCORE_SSO_ENABLED`) is already fixed in `docker-compose.test.yml`.
+- **`CREDS_KEY`/`CREDS_IV`: generate once and never change them** — rotating makes anything already
+  encrypted in the database unreadable.
+- The selectable Claude models live in `librechat.test.yaml` (committed), not in this file.
+
+### 4D. Confirm with the backend team
+**WHO: you → backend team.** Confirm the exact Spring **`/oauth/token_key`** URL (the public key
+endpoint LibreChat uses to verify Outerscore login tokens) and put it in `OUTERSCORE_TOKEN_KEY_URL`.
 
 ---
 
-## Deploy
+## 5. Deploy
 
-**Automatic:** every merge to **`dev`** builds and redeploys test (`dev` is the test line).
+Once [§4](#4-one-time-setup) is done:
 
-**Manual (any branch):** GitHub → Actions → **Deploy LibreChat to Test** → *Run workflow* →
-pick a branch.
+- **Normal:** merge your changes into **`dev`** → the deploy runs automatically.
+- **Manual:** GitHub → Actions → **Deploy LibreChat to Test** → **Run workflow** → choose a branch.
 
-Either way the build pushes `ghcr.io/<owner>/librechat-test:<branch>-<sha>` (and `:test-latest`)
-and the deploy job pulls it and restarts the stack.
+You can watch progress under the **Actions** tab. It builds the image, pushes it to GHCR, then
+restarts the stack on the server.
 
-> The workflow file must be on **`dev`** for the push trigger to fire, and on the **default
-> branch** for the manual "Run workflow" button to appear. `docker-compose.test.yml` and
-> `librechat.test.yaml` must exist on whatever branch is deployed.
+---
 
-### Standalone smoke test (SSO disabled path)
+## 6. Verify it worked
 
-Registration/email login are off (SSO-only). To log in directly for a smoke test,
-mint a user on the host:
+1. **Health check** (from anywhere):
+   ```bash
+   curl -fsS https://test.outerscore.com/ai/chat/health      # should print: OK
+   ```
+2. **Open** `https://test.outerscore.com/ai/chat/` in a browser — the login screen should render
+   and assets should load from `/ai/chat/...` (no 404s in the browser's Network tab).
+3. **Log in (standalone test).** Public registration is off, so create a user on the server:
+   ```bash
+   cd /opt/librechat
+   docker compose -f docker-compose.test.yml exec api npm run create-user
+   ```
+   Then sign in and send a message — a Claude reply should stream back.
+4. **Embedded** (once the Buyer-app AI integration is shipped — see [caveat](#caveats)): open the
+   Buyer test app, open the assistant, and confirm it signs you in with no second login.
+
+---
+
+## 7. Day-2 operations (on the server)
 
 ```bash
 cd /opt/librechat
-docker compose -f docker-compose.test.yml exec api npm run create-user
+docker compose -f docker-compose.test.yml ps          # status
+docker compose -f docker-compose.test.yml logs -f api  # live logs
+docker compose -f docker-compose.test.yml restart api  # restart just the app
 ```
+- **Roll back:** re-run the workflow (manual dispatch) against a previous known-good branch/commit,
+  or on the server set `LIBRECHAT_IMAGE` in `/opt/librechat/.env` to an earlier
+  `ghcr.io/<owner>/librechat-test:<tag>` and run `docker compose -f docker-compose.test.yml up -d`.
+- **Back up data:** `docker compose -f docker-compose.test.yml exec mongodb mongodump --archive` (the
+  `mongo-data` / `meili-data` named volumes hold all state).
 
 ---
 
-## Verify
+## 8. Troubleshooting
 
-1. `curl -fsS https://test.outerscore.com/ai/chat/health` → `OK`
-2. Open `https://test.outerscore.com/ai/chat/` — login renders; in DevTools Network,
-   assets load from `/ai/chat/assets/...` and API calls hit `/ai/chat/api/...`
-   (no bare `/api`, no 404s). Send a Claude message → it streams.
-3. Embedded: open the Buyer test app → AI launcher → iframe loads `…/ai/chat/`,
-   SSO auto-login (no second prompt), theme matches, a Claude turn streams.
-4. Security: framing from a non-`test.outerscore.com` origin is blocked (CSP);
-   the response carries `X-Robots-Tag: noindex`; Mongo/Meili are unreachable from
-   outside the host.
+| Symptom | Likely cause / fix |
+|---|---|
+| Workflow doesn't appear under Actions | `deploy-test.yml` isn't on the **default branch** yet |
+| Merge to `dev` didn't deploy | `deploy-test.yml` isn't on **`dev`**, or the run is paused waiting on a **Required reviewer** (remove it) |
+| Deploy fails at the SSH step | `SSH_HOST/USER/KEY` wrong, or `/opt/librechat` missing/not writable |
+| `curl …/ai/chat/health` not `OK` | container not running (`docker compose ... logs api`) or the proxy rule (§4A iii) not added/reloaded |
+| Page loads but assets 404 / calls hit bare `/api` | proxy rule missing the trailing-slash strip, or `DOMAIN_CLIENT` not set to the `/ai/chat` URL |
+| Chat won't embed in the Buyer app | the `Content-Security-Policy: frame-ancestors 'self'` header (§4A iii) is missing |
+| Login via Outerscore fails | see the troubleshooting table in [`outerscore-auth.md`](./outerscore-auth.md) (token-key URL, 401/400/500 causes) |
 
 ---
 
-## Security notes
+## 9. Hand-off for the server admin
 
-- **Auto-deploy + secrets:** `dev` is the trusted test line — protect it with PR review.
-  The `test` environment has no required reviewers (so merges deploy unattended); to stop an
-  arbitrary branch from reading the secrets via manual dispatch, use the environment's
-  **Deployment branches** policy (`dev` only).
-- App is **SSO-only** (`ALLOW_REGISTRATION/EMAIL_LOGIN/SOCIAL_LOGIN=false`); remove any
-  bootstrap admin after smoke testing.
-- Datastores have **no published ports**; the api listens on `127.0.0.1` only.
-- `.env` is written `chmod 600`; rotate `JWT_*`/`CREDS_*`/`MEILI_MASTER_KEY` on exposure.
-  The host's GHCR credential is dropped (`docker logout`) at the end of each deploy.
-- Back up the `mongo-data` volume (`mongodump`). Keep the GHCR package **private**.
-- To add file-RAG later, switch to the canonical `docker-compose.yml` +
-  `docker-compose.prod.yml` stack (adds `rag_api` + pgvector).
+Paste this to whoever manages `test.outerscore.com`. It's the only part that needs server access.
+
+> **Please help set up the AI chat (a Docker stack) on the test server. Two one-time things:**
+>
+> **1) Create its working folder** (the CI deploy uploads files + writes its `.env` here; it must
+> be writable by the SSH user our GitHub Actions uses):
+> ```bash
+> sudo install -d -o <deploy-ssh-user> /opt/librechat
+> mkdir -p /opt/librechat/{images,uploads,logs}
+> sudo chown -R 1000:1000 /opt/librechat/{images,uploads,logs}
+> ```
+> Also confirm: docker + docker compose are installed, the deploy SSH user is in the `docker`
+> group, and port **3080 on 127.0.0.1** is free.
+>
+> **2) Add a reverse-proxy rule** so `https://test.outerscore.com/ai/chat/` proxies to the
+> container on `127.0.0.1:3080` (it strips the `/ai/chat` prefix), and sends a CSP header so the
+> Buyer app can iframe it. Use the nginx or Apache block from §4A(iii) of this doc, then reload
+> the web server.
+>
+> That's it — the app itself is deployed automatically by GitHub Actions; you don't need to pull
+> images or run the app by hand.
+
+---
+
+## 10. Reference
+
+**Files (in this repo):**
+
+| File | Purpose |
+|---|---|
+| `.github/workflows/deploy-test.yml` | the deploy pipeline (auto on `dev` + manual) |
+| `docker-compose.test.yml` | the stack: api + mongodb + meilisearch |
+| `librechat.test.yaml` | Claude-only model config (mounted as `/app/librechat.yaml`) |
+| `docs/outerscore-auth.md` | how Outerscore SSO / login works |
+
+**Runtime variables** (everything not in `LIBRECHAT_TEST_ENV` is pinned in `docker-compose.test.yml`):
+
+| Variable | Set in | Meaning |
+|---|---|---|
+| `DOMAIN_CLIENT` / `DOMAIN_SERVER` | secret | the public `/ai/chat` URL (drives the subpath) |
+| `JWT_SECRET` / `JWT_REFRESH_SECRET` | secret | sign LibreChat's own login session |
+| `CREDS_KEY` / `CREDS_IV` | secret | encrypt stored credentials (set once, never change) |
+| `MEILI_MASTER_KEY` | secret | search service auth |
+| `ANTHROPIC_API_KEY` | secret | Claude API key |
+| `OUTERSCORE_TOKEN_KEY_URL` | secret | verifies Outerscore login tokens |
+| `OUTERSCORE_SSO_ENABLED`, `NO_INDEX`, `TRUST_PROXY`, `ALLOW_*` | compose | fixed test-env settings |
+
+**Caveats**
+- **Standalone vs embedded:** this guide makes the chat live and testable on its own at the URL.
+  Embedding it *inside the Buyer app* additionally needs the frontend AI integration (the iframe
+  host component), which is a separate track.
+- **Secrets location:** this setup keeps the `.env` as a GitHub `test`-environment secret. If you
+  prefer secrets to live only on the server (never in GitHub), that's a small workflow change —
+  ask the maintainer.

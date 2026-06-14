@@ -377,6 +377,16 @@ export const isMessageCanvasDoc = (messageId?: string | null): boolean => {
   return readCanvasDocIds().includes(messageId);
 };
 
+/** Drop the canvas-doc registry — called on logout so a new session starts clean. */
+export const clearCanvasDocIds = (): void => {
+  canvasDocIdsCache = [];
+  try {
+    localStorage.removeItem(CANVAS_DOC_IDS_KEY);
+  } catch {
+    // storage unavailable — the in-memory reset above still applies.
+  }
+};
+
 /**
  * Strip canvas envelopes (`<document>` tags + the `<compliance>` block) from a
  * reply so it reads as plain content. Used on chat-mode replies from models
@@ -438,12 +448,20 @@ export const extractDocBody = (text: string): string => {
   if (closeIdx !== -1) {
     body = body.slice(0, closeIdx);
   }
-  const compIdx = body.indexOf('<compliance>');
+  const compIdx = body.indexOf(COMPLIANCE_OPEN);
   if (compIdx !== -1) {
     body = body.slice(0, compIdx);
   }
   return body.trim();
 };
+
+/** Raw, unvalidated finding shape as parsed from the model's JSON envelope. */
+interface RawComplianceFinding {
+  text?: unknown;
+  severity?: unknown;
+  reason?: unknown;
+  suggestion?: unknown;
+}
 
 /**
  * Pull the `<compliance>{…}</compliance>` envelope out of a reply: returns the
@@ -461,26 +479,29 @@ export const parseComplianceEnvelope = (
   try {
     const parsed = JSON.parse(match[1]) as { findings?: unknown };
     if (Array.isArray(parsed?.findings)) {
-      findings = parsed.findings.reduce<ComplianceFinding[]>((acc, item) => {
-        if (
-          item &&
-          typeof item.text === 'string' &&
-          typeof item.severity === 'string' &&
-          typeof item.reason === 'string' &&
-          SEVERITIES.has(item.severity.toUpperCase())
-        ) {
-          const finding: ComplianceFinding = {
-            text: item.text,
-            severity: item.severity.toUpperCase() as ComplianceSeverity,
-            reason: item.reason,
-          };
-          if (typeof item.suggestion === 'string' && item.suggestion.trim().length > 0) {
-            finding.suggestion = item.suggestion.slice(0, SUGGESTION_MAX_LEN);
+      findings = (parsed.findings as RawComplianceFinding[]).reduce<ComplianceFinding[]>(
+        (acc, item) => {
+          if (
+            item &&
+            typeof item.text === 'string' &&
+            typeof item.severity === 'string' &&
+            typeof item.reason === 'string' &&
+            SEVERITIES.has(item.severity.toUpperCase())
+          ) {
+            const finding: ComplianceFinding = {
+              text: item.text,
+              severity: item.severity.toUpperCase() as ComplianceSeverity,
+              reason: item.reason,
+            };
+            if (typeof item.suggestion === 'string' && item.suggestion.trim().length > 0) {
+              finding.suggestion = item.suggestion.slice(0, SUGGESTION_MAX_LEN);
+            }
+            acc.push(finding);
           }
-          acc.push(finding);
-        }
-        return acc;
-      }, []);
+          return acc;
+        },
+        [],
+      );
     }
   } catch {
     return { findings: [], stripped: text };

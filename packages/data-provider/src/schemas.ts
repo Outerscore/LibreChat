@@ -1288,10 +1288,6 @@ export const compactAgentsBaseSchema = tConversationSchema.pick({
   agent_id: true,
   instructions: true,
   additional_instructions: true,
-  // Outerscore: carry the invisibly-injected canvas document to the server so the
-  // selected compliance agent can audit it (server folds it into the agent's
-  // instructions — see api Endpoints/agents/build.js + controllers/agents/client.js).
-  promptPrefix: true,
 });
 
 export const compactAgentsSchema = compactAgentsBaseSchema

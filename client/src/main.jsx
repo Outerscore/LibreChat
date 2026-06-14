@@ -11,6 +11,7 @@ import './style/outerscore-tokens.css';
 import './style/outerscore.css';
 import { ApiErrorBoundaryProvider } from './hooks/ApiErrorBoundaryContext';
 import { setOuterscoreToken, clearOuterscoreToken } from './utils/outerscoreToken';
+import { clearCanvasDocIds } from './utils/canvas';
 import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/copy-tex.js';
 
@@ -96,6 +97,7 @@ try {
       }
       if (data.type === 'outerscore:logout') {
         clearOuterscoreToken();
+        clearCanvasDocIds();
         try {
           sessionStorage.removeItem('outerscore:canvas-content');
         } catch {

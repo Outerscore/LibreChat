@@ -29,6 +29,10 @@ const outerscoreBridgeController = async (req, res) => {
       tokenKeyUrl,
       issuer: process.env.OUTERSCORE_JWT_ISSUER || undefined,
       audience: process.env.OUTERSCORE_JWT_AUDIENCE || undefined,
+      // The signed iss/aud are the trust anchor (accounts are keyed on user.id
+      // alone), so require them in production: without them a token minted for
+      // another service with the same signing key would bridge to an account.
+      requireIssuerAudience: process.env.NODE_ENV === 'production',
     });
   } catch (err) {
     logger.warn('[outerscore] token verification failed:', {
@@ -69,7 +73,9 @@ const outerscoreBridgeController = async (req, res) => {
         patch.emailVerified = true;
       }
       if (Object.keys(patch).length > 0) {
-        await updateUser(user._id, patch);
+        // Use the updated doc so the response reflects the patch, not the
+        // pre-patch name/emailVerified.
+        user = (await updateUser(user._id, patch)) ?? user;
       }
     } else {
       const appConfig = await getAppConfig({ baseOnly: true });
@@ -92,9 +98,12 @@ const outerscoreBridgeController = async (req, res) => {
     }
 
     const sessionToken = await setAuthTokens(user._id, res);
-    const { password: _p, totpSecret: _t, __v, ...safeUser } = user.toObject
-      ? user.toObject()
-      : user;
+    const {
+      password: _p,
+      totpSecret: _t,
+      __v,
+      ...safeUser
+    } = user.toObject ? user.toObject() : user;
     safeUser.id = safeUser._id.toString();
 
     return res.status(200).json({ token: sessionToken, user: safeUser });

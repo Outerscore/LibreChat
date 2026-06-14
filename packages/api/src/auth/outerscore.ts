@@ -25,6 +25,13 @@ export interface OuterscoreVerifyOptions {
   tokenKeyUrl: string;
   issuer?: string;
   audience?: string;
+  /**
+   * When true, `issuer` and `audience` are mandatory — verification throws if
+   * either is missing. The bridge sets this in production so a token minted for
+   * a different service (same signing key, different `aud`) is rejected; the
+   * signed `iss`/`aud` are the trust anchor, not just the signature.
+   */
+  requireIssuerAudience?: boolean;
 }
 
 interface CachedKey {
@@ -33,6 +40,7 @@ interface CachedKey {
 }
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const TOKEN_KEY_FETCH_TIMEOUT_MS = 5000;
 let cachedKey: CachedKey | null = null;
 
 interface TokenKeyResponse {
@@ -41,7 +49,16 @@ interface TokenKeyResponse {
 }
 
 async function fetchTokenKey(url: string): Promise<string> {
-  const response = await fetch(url);
+  // Bound the fetch — a hung token_key endpoint would otherwise stall every
+  // bridge request waiting on a cache miss.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TOKEN_KEY_FETCH_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!response.ok) {
     throw new Error(
       `[outerscore] token_key fetch failed: ${response.status} ${response.statusText}`,
@@ -74,6 +91,17 @@ export async function verifyOuterscoreToken(
 ): Promise<OuterscoreTokenPayload> {
   const opts: OuterscoreVerifyOptions =
     typeof options === 'string' ? { tokenKeyUrl: options } : options;
+
+  // In production the signed iss/aud are the intended trust anchor (accounts are
+  // keyed on user.id alone). Warn loudly when they're not configured rather than
+  // refusing the login — so an interim shared-key deployment keeps working while
+  // the gap stays visible in the logs. Set both env vars to make it enforced.
+  if (opts.requireIssuerAudience && (!opts.issuer || !opts.audience)) {
+    logger.warn(
+      '[outerscore] OUTERSCORE_JWT_ISSUER / OUTERSCORE_JWT_AUDIENCE are not set in production — ' +
+        'tokens are accepted on signature alone. Set both to reject tokens minted for other services.',
+    );
+  }
 
   const verifyOptions: jwt.VerifyOptions = { algorithms: ['RS256'] };
   if (opts.issuer) {

@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { dataService } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
-import {
-  getOuterscoreToken,
-  clearOuterscoreToken,
-} from '~/utils/outerscoreToken';
+import { getOuterscoreToken, clearOuterscoreToken } from '~/utils/outerscoreToken';
 import { postToParent } from '~/utils/canvas';
 
 const PAGE_STORAGE_KEY = 'outerscore:page';
