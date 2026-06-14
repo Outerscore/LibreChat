@@ -1,0 +1,82 @@
+# Outerscore LibreChat — self-contained TEST stack.
+#
+# Deployed by .github/workflows/deploy-test.yml to the self-hosted test host and
+# run from /opt/librechat as:
+#     docker compose -f docker-compose.test.yml up -d
+#
+# This file is intentionally standalone (it does NOT layer on docker-compose.yml)
+# so the minimal stack is api + mongodb + meilisearch only — no RAG/pgvector for v1.
+#
+# Configuration:
+#   - Compose auto-loads ./.env (written by the deploy job from the GitHub
+#     Environment secret LIBRECHAT_TEST_ENV) for ${...} interpolation AND injects
+#     it into the api container via `env_file`.
+#   - The `environment:` block below holds deployment-INVARIANT values that must
+#     win over .env (internal service hosts + security toggles).
+#
+# The app is served under the subpath https://test.outerscore.com/ai/chat:
+# set DOMAIN_CLIENT/DOMAIN_SERVER to that URL in .env — the server rewrites the
+# client <base href> and the reverse proxy strips the /ai/chat prefix.
+services:
+  api:
+    image: ${LIBRECHAT_IMAGE}
+    container_name: librechat-test
+    restart: always
+    ports:
+      # Bind to loopback only — the host reverse proxy is the sole entry point.
+      - "127.0.0.1:3080:3080"
+    depends_on:
+      - mongodb
+      - meilisearch
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - NODE_ENV=production
+      # Internal service addresses (never come from .env).
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - SEARCH=true
+      # Test-environment safety toggles — enforced regardless of .env contents.
+      - NO_INDEX=true
+      - TRUST_PROXY=1
+      - ALLOW_REGISTRATION=false
+      - ALLOW_EMAIL_LOGIN=false
+      - ALLOW_SOCIAL_LOGIN=false
+      - OUTERSCORE_SSO_ENABLED=true
+    volumes:
+      - ./.env:/app/.env
+      - ./librechat.test.yaml:/app/librechat.yaml
+      - ./images:/app/client/public/images
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3080/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  mongodb:
+    image: mongo:8.0.20
+    container_name: librechat-test-mongo
+    restart: always
+    command: mongod --noauth
+    volumes:
+      - mongo-data:/data/db
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    container_name: librechat-test-meili
+    restart: always
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+    volumes:
+      - meili-data:/meili_data
+
+volumes:
+  mongo-data:
+  meili-data:
