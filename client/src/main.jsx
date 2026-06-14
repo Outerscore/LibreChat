@@ -21,6 +21,14 @@ try {
     sessionStorage.setItem('outerscore:page', osPage);
   }
 
+  // The Outerscore feature the assistant was launched from, as an agent-category
+  // value (see `getAgentCategory` in utils/outerscoreAgentCategory). Stored so the
+  // marketplace / agent picker can scope to the feature's agents. Mirrors os_page.
+  const osCategory = params.get('os_category');
+  if (osCategory) {
+    sessionStorage.setItem('outerscore:agent-category', osCategory);
+  }
+
   if (window.parent !== window) {
     // Pin theme to light when embedded — the chat follows the Outerscore host
     // palette, so any LibreChat dark-mode class would fight the re-skin. The

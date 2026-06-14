@@ -154,6 +154,9 @@ export function createAgentCategoryMethods(mongoose: typeof import('mongoose')) 
   async function ensureDefaultCategories(): Promise<boolean> {
     const AgentCategory = mongoose.models.AgentCategory as Model<IAgentCategory>;
 
+    // Outerscore VMS agent categories (source of truth for the agent-builder dropdown
+    // and marketplace tabs). Update labels/descriptions in the en/de translation files
+    // under the matching `com_agents_category_*` keys.
     const defaultCategories = [
       {
         value: 'general',
@@ -162,40 +165,58 @@ export function createAgentCategoryMethods(mongoose: typeof import('mongoose')) 
         order: 0,
       },
       {
-        value: 'hr',
-        label: 'com_agents_category_hr',
-        description: 'com_agents_category_hr_description',
+        value: 'user',
+        label: 'com_agents_category_user',
+        description: 'com_agents_category_user_description',
         order: 1,
       },
       {
-        value: 'rd',
-        label: 'com_agents_category_rd',
-        description: 'com_agents_category_rd_description',
+        value: 'compliance',
+        label: 'com_agents_category_compliance',
+        description: 'com_agents_category_compliance_description',
         order: 2,
       },
       {
-        value: 'finance',
-        label: 'com_agents_category_finance',
-        description: 'com_agents_category_finance_description',
+        value: 'reporting',
+        label: 'com_agents_category_reporting',
+        description: 'com_agents_category_reporting_description',
         order: 3,
       },
       {
-        value: 'it',
-        label: 'com_agents_category_it',
-        description: 'com_agents_category_it_description',
+        value: 'supplier',
+        label: 'com_agents_category_supplier',
+        description: 'com_agents_category_supplier_description',
         order: 4,
       },
       {
-        value: 'sales',
-        label: 'com_agents_category_sales',
-        description: 'com_agents_category_sales_description',
+        value: 'workforce',
+        label: 'com_agents_category_workforce',
+        description: 'com_agents_category_workforce_description',
         order: 5,
       },
       {
-        value: 'aftersales',
-        label: 'com_agents_category_aftersales',
-        description: 'com_agents_category_aftersales_description',
+        value: 'requisition',
+        label: 'com_agents_category_requisition',
+        description: 'com_agents_category_requisition_description',
         order: 6,
+      },
+      {
+        value: 'rfx',
+        label: 'com_agents_category_rfx',
+        description: 'com_agents_category_rfx_description',
+        order: 7,
+      },
+      {
+        value: 'work_order_contracts',
+        label: 'com_agents_category_work_order_contracts',
+        description: 'com_agents_category_work_order_contracts_description',
+        order: 8,
+      },
+      {
+        value: 'timesheets_invoicing',
+        label: 'com_agents_category_timesheets_invoicing',
+        description: 'com_agents_category_timesheets_invoicing_description',
+        order: 9,
       },
     ];
 
@@ -245,7 +266,26 @@ export function createAgentCategoryMethods(mongoose: typeof import('mongoose')) 
       await tenantSafeBulkWrite(AgentCategory, bulkOps, { ordered: false });
     }
 
-    return updates.length > 0 || created > 0;
+    // Deactivate previously-seeded (non-custom) categories that are no longer part of
+    // the default set, so dropped defaults stop appearing in already-seeded databases.
+    // User-created (custom) categories are left untouched.
+    const defaultValues = new Set(defaultCategories.map((category) => category.value));
+    const staleCategories = existingCategories.filter(
+      (category) => !category.custom && category.isActive && !defaultValues.has(category.value),
+    );
+
+    if (staleCategories.length > 0) {
+      const staleOps = staleCategories.map((category) => ({
+        updateOne: {
+          filter: { value: category.value, custom: { $ne: true } },
+          update: { $set: { isActive: false } },
+        },
+      }));
+
+      await tenantSafeBulkWrite(AgentCategory, staleOps, { ordered: false });
+    }
+
+    return updates.length > 0 || created > 0 || staleCategories.length > 0;
   }
 
   return {
