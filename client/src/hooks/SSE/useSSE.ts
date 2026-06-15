@@ -3,32 +3,15 @@ import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSetRecoilState } from 'recoil';
-import { request, createPayload, removeNullishValues, QueryKeys } from 'librechat-data-provider';
+import { request, createPayload, removeNullishValues } from 'librechat-data-provider';
 import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
-import type { CanvasIntent, CanvasStreamMessage } from '~/utils/canvas';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { createCanvasStreamBridge } from './canvasStream';
 import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
-import {
-  detectCanvasIntent,
-  extractDocBody,
-  extractMessageText,
-  formatComplianceReply,
-  isComplianceOnlyReply,
-  isOnCanvasPage,
-  markMessageAsCanvasDoc,
-  parseComplianceEnvelope,
-  postToParent,
-  replaceTextParts,
-  resolveCanvasRouting,
-  stripCanvasEnvelopes,
-  CANVAS_PLACEHOLDER_TEXT,
-  COMPLIANCE_SUMMARY_TEXT,
-  NO_COMPLIANCE_FINDINGS_TEXT,
-} from '~/utils/canvas';
 import store from '~/store';
 
 type ChatHelpers = Pick<
@@ -104,92 +87,12 @@ export default function useSSE(
     payload = removeNullishValues(payload) as TPayload;
 
     let textIndex = null;
-    let rawText = '';
-    let sentDocBody = '';
-    let canvasStreamStarted = false;
-    let canvasIntent: CanvasIntent = 'pending';
-    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    // Routing (see utils/canvas): the user's composer toggle wins, else the env
-    // lever. 'chat' never touches the canvas; 'always' forwards every reply as
-    // the document (weak/local models); 'intent' (default, Claude) lets the
-    // model decide via the <document> envelope, which keeps in-chat Q&A working.
-    const canvasRouting = resolveCanvasRouting();
-    // Page must be canvas-capable; whether a given turn actually drives the
-    // canvas is decided per-reply by canvasIntent (the <document> marker).
-    const canvasCapable = isInIframe && isOnCanvasPage() && canvasRouting !== 'chat';
-    const alwaysDocument = canvasRouting === 'always';
-    const postToCanvas = (message: CanvasStreamMessage) => {
-      if (!canvasCapable) {
-        return;
-      }
-      postToParent(message);
-    };
-    const replaceLastAssistantText = (newText: string) => {
-      const msgs = getMessages();
-      if (!msgs || msgs.length === 0) {
-        return;
-      }
-      const lastIdx = msgs.length - 1;
-      const last = msgs[lastIdx];
-      if (last.isCreatedByUser) {
-        return;
-      }
-      // Replace only the TEXT parts — reasoning/think parts stay visible in chat.
-      const replaced: TMessage = {
-        ...last,
-        text: newText,
-        content: replaceTextParts(last.content, newText),
-      };
-      const nextMessages = [...msgs.slice(0, lastIdx), replaced];
-      setMessages(nextMessages);
-      const convoId = last.conversationId ?? submission.conversation?.conversationId;
-      if (convoId) {
-        queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], (prev) => {
-          if (!prev || prev.length === 0) {
-            return prev;
-          }
-          const prevLast = prev[prev.length - 1];
-          if (prevLast.isCreatedByUser) {
-            return prev;
-          }
-          return [
-            ...prev.slice(0, prev.length - 1),
-            { ...prevLast, text: newText, content: replaceTextParts(prevLast.content, newText) },
-          ];
-        });
-      }
-    };
-    const replaceLastAssistantWithPlaceholder = () => {
-      const msgs = getMessages();
-      const last = msgs?.[msgs.length - 1];
-      if (!last || last.isCreatedByUser) {
-        return;
-      }
-      // Durable marker: this reply drove the canvas, so the display layer keeps
-      // masking it even after the user switches mode (always-mode docs carry no
-      // marker in their stored text).
-      markMessageAsCanvasDoc(last.messageId);
-      replaceLastAssistantText(CANVAS_PLACEHOLDER_TEXT);
-    };
-    // Chat mode forwards nothing, but a weak model may still emit the canvas
-    // envelopes despite the chat-only instructions — strip them so the reply
-    // reads as a clean chat bubble instead of raw tags.
-    const sanitizeChatModeReply = () => {
-      if (!isInIframe || canvasRouting !== 'chat' || !isOnCanvasPage()) {
-        return;
-      }
-      const msgs = getMessages() ?? [];
-      const last = msgs[msgs.length - 1];
-      if (!last || last.isCreatedByUser) {
-        return;
-      }
-      const current = extractMessageText(last);
-      const stripped = stripCanvasEnvelopes(current);
-      if (!stripped || stripped === current.trim()) {
-        return;
-      }
-      replaceLastAssistantText(stripped);
-    };
+    const canvasBridge = createCanvasStreamBridge({
+      getMessages,
+      setMessages,
+      queryClient,
+      getConversationId: () => submission.conversation?.conversationId,
+    });
     clearStepMaps();
 
     const sse = new SSE(payloadData.server, {
@@ -206,51 +109,6 @@ export default function useSSE(
       }
     });
 
-    const forwardCanvasStream = () => {
-      if (!canvasCapable) {
-        return;
-      }
-      const msgs = getMessages() ?? [];
-      const last = msgs[msgs.length - 1];
-      if (!last || last.isCreatedByUser) {
-        return;
-      }
-      const currentText = extractMessageText(last);
-      if (!currentText) {
-        return;
-      }
-      rawText = currentText;
-      // 'always' routing: the host already decided this turn targets the
-      // document, so route every reply to the canvas — no <document> envelope
-      // required (works on any model). 'intent': the model decides via the tag.
-      if (alwaysDocument) {
-        canvasIntent = 'yes';
-      } else if (canvasIntent === 'pending') {
-        canvasIntent = detectCanvasIntent(currentText);
-        // No <document> tag yet — it may still arrive (weak models preamble
-        // first), so stay pending and post nothing to the canvas.
-        if (canvasIntent !== 'yes') {
-          return;
-        }
-      }
-      // Document reply: stream only the body inside <document>…</document>.
-      const body = extractDocBody(currentText);
-      if (body.length <= sentDocBody.length) {
-        return;
-      }
-      if (!canvasStreamStarted) {
-        canvasStreamStarted = true;
-        postToCanvas({ type: 'outerscore:stream-start' });
-      }
-      const chunk = body.slice(sentDocBody.length);
-      sentDocBody = body;
-      postToCanvas({
-        type: 'outerscore:stream-chunk',
-        chunk,
-        accumulated: body,
-      });
-    };
-
     sse.addEventListener('message', (e: MessageEvent) => {
       const data = JSON.parse(e.data);
 
@@ -264,56 +122,7 @@ export default function useSSE(
           setShowStopButton(false);
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
-        forwardCanvasStream();
-        sanitizeChatModeReply();
-        if (canvasCapable) {
-          if (alwaysDocument) {
-            canvasIntent = 'yes';
-          } else if (canvasIntent === 'pending') {
-            canvasIntent = detectCanvasIntent(rawText);
-          }
-          // Only a document reply drives the canvas; a normal chat reply is
-          // left in the thread untouched (no stream-end, no placeholder).
-          if (canvasIntent === 'yes') {
-            // TODO(compliance): regular-mode compliance disabled — a document write
-            // no longer forwards findings (they referenced the pre-edit content and
-            // mismatched the editor highlights). Compliance is produced only by the
-            // explicitly-selected compliance agent (handled by the audit path below).
-            // const { findings } = parseComplianceEnvelope(rawText);
-            const body = extractDocBody(rawText);
-            // Never clobber the editor with an empty body — weak models can
-            // return nothing usable; leave the chat reply in place instead.
-            if (body.length > 0) {
-              postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
-              // postToCanvas({ type: 'outerscore:compliance-result', findings });
-              replaceLastAssistantWithPlaceholder();
-              postToCanvas({ type: 'outerscore:canvas-complete' });
-            }
-          }
-        }
-        // Audit reply (a <compliance> envelope, no <document>): the raw JSON must
-        // never remain in the chat bubble. On a canvas page the findings drive the
-        // host panel + editor highlights, so the bubble just points there; in a
-        // regular chat (no panel) the findings are rendered readably in the bubble.
-        // Skipped in always-mode (the whole reply is the document, handled above).
-        if (!alwaysDocument) {
-          const msgs = getMessages() ?? [];
-          const last = msgs[msgs.length - 1];
-          const replyText = last && !last.isCreatedByUser ? extractMessageText(last) : '';
-          if (isComplianceOnlyReply(replyText)) {
-            const { findings } = parseComplianceEnvelope(replyText);
-            if (isInIframe && isOnCanvasPage()) {
-              postToParent({ type: 'outerscore:compliance-result', findings });
-              const stripped = stripCanvasEnvelopes(replyText);
-              replaceLastAssistantText(
-                stripped ||
-                  (findings.length > 0 ? COMPLIANCE_SUMMARY_TEXT : NO_COMPLIANCE_FINDINGS_TEXT),
-              );
-            } else {
-              replaceLastAssistantText(formatComplianceReply(replyText));
-            }
-          }
-        }
+        canvasBridge.finalize();
         return;
       } else if (data.created != null) {
         const runId = v4();
@@ -351,7 +160,7 @@ export default function useSSE(
         }
       }
 
-      forwardCanvasStream();
+      canvasBridge.forwardCanvasStream();
     });
 
     sse.addEventListener('open', () => {

@@ -1,6 +1,7 @@
 export * from './avatars';
 export * from './chain';
 export * from './client';
+export * from './compliance';
 export * from './config';
 export * from './context';
 export * from './edges';

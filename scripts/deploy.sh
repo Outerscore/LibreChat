@@ -28,6 +28,7 @@
 #
 #   Optional runtime:
 #     OUTERSCORE_JWT_ISSUER, OUTERSCORE_JWT_AUDIENCE
+#     OUTERSCORE_JWT_ENFORCE_CLAIMS   true to reject logins missing iss/aud (fail-closed)
 #     OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_KEY
 #     LIBRECHAT_IMAGE                 Image tag (default: librechat:latest)
 #     ENVIRONMENT                     Label for logs (dev/staging/prod)

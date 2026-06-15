@@ -176,9 +176,16 @@ ANTHROPIC_API_KEY=sk-ant-...
 OUTERSCORE_TOKEN_KEY_URL=https://test.outerscore.com/api/oauth/token_key
 OUTERSCORE_JWT_ISSUER=
 OUTERSCORE_JWT_AUDIENCE=
+OUTERSCORE_JWT_ENFORCE_CLAIMS=false
 ```
 
 Notes:
+- **`OUTERSCORE_JWT_ISSUER` / `OUTERSCORE_JWT_AUDIENCE` are recommended.** When set, the bridge
+  verifies those claims so a token minted for another service signed with the same key can't be
+  reused here. To make them **mandatory** (reject a login whose token lacks them, fail-closed),
+  also set `OUTERSCORE_JWT_ENFORCE_CLAIMS=true`. Left as above the bridge accepts on signature
+  alone and logs a one-time warning — fine for first bring-up; set the values + flag once the
+  backend team confirms them (§4D). This is **not** tied to `NODE_ENV`.
 - Everything else (`HOST`, `PORT`, `MONGO_URI`, `MEILI_HOST`, `NO_INDEX`, `TRUST_PROXY`,
   registration toggles, `OUTERSCORE_SSO_ENABLED`) is already fixed in `docker-compose.test.yml`.
 - **`CREDS_KEY`/`CREDS_IV`: generate once and never change them** — rotating makes anything already

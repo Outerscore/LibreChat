@@ -67,30 +67,20 @@ interface CanvasSpec {
 }
 
 /*
- * TODO(compliance): regular-mode compliance is DISABLED for now.
+ * Regular-mode compliance is intentionally DISABLED. Auto-running compliance
+ * inside a normal canvas reply was confusing and buggy: asking to "improve the
+ * brief" made the model rewrite AND audit in the same turn, so the findings
+ * referenced the PRE-EDIT content and the host could not match those spans
+ * against the freshly-replaced editor. Compliance is now produced ONLY by the
+ * explicitly-selected compliance agent (seeded server-side — see the compliance
+ * module in `packages/api` and `complianceAgents.js`); the SSE audit path still
+ * parses/forwards that agent's `<compliance>` envelope.
  *
- * Auto-running compliance inside a normal canvas reply was both confusing and
- * buggy: asking to "improve the brief" made the model rewrite AND audit in the
- * same turn, so the findings referenced the PRE-EDIT content it was given and
- * the host could not match those spans against the freshly-replaced editor.
- *
- * Compliance is now produced ONLY by the explicitly-selected compliance agent
- * (a specific agent with a specific prompt, seeded server-side in
- * api/server/services/Outerscore/complianceAgents.js). The SSE audit path still
- * parses/forwards that agent's <compliance> envelope.
- *
- * To re-enable regular-mode compliance, uncomment this clause + its call sites
- * and the AUDIT branch in buildSpecPrompt below, plus the document-path
- * forwarding in useSSE.ts / useResumableSSE.ts.
+ * To re-enable here, reintroduce a `complianceClause(rules)` builder and append
+ * it in the 'always'/'intent' branches below, plus the document-path forwarding
+ * in the canvas stream bridge. `CanvasSpec.rules` is kept for exactly that; see
+ * git history for the previous inline implementation.
  */
-// const complianceClause = (rules: string[]): string =>
-//   [
-//     'Immediately after </document>, append a single compliance envelope and nothing else:',
-//     '<compliance>{"findings":[{"text":"<verbatim span from the document>","severity":"HIGH|MODERATE|LOW","reason":"<short explanation>","suggestion":"<optional replacement — omit when the right fix is to delete or rewrite from scratch>"}]}</compliance>',
-//     'Keep each suggestion under 600 characters and write it so it can replace the flagged span in place. If there is nothing to flag, append <compliance>{"findings":[]}</compliance>.',
-//     'Check the document against these rules:',
-//     ...rules.map((r) => `- ${r}`),
-//   ].join('\n');
 
 /**
  * Intent-aware canvas system prompt. The model decides, per turn, whether the
@@ -99,9 +89,9 @@ interface CanvasSpec {
  *    streams into the editor canvas;
  *  - anything else  → a normal chat reply with no tags, which stays in the chat.
  *
- * Compliance is intentionally NOT part of this prompt — see the TODO on
- * `complianceClause` above. Returned as *system* instructions so the document
- * never appears in the visible user message.
+ * Compliance is intentionally NOT part of this prompt — see the compliance note
+ * above. Returned as *system* instructions so the document never appears in the
+ * visible user message.
  */
 const buildSpecPrompt = (
   spec: CanvasSpec,
@@ -149,8 +139,6 @@ const buildSpecPrompt = (
       ...context,
       `Treat the user's message as an instruction to create or revise the ${spec.artifact}. Reply with the COMPLETE updated ${spec.artifact} in Markdown — no preamble, no commentary, no code fences.`,
       spec.structure,
-      // TODO(compliance): regular-mode compliance disabled — see complianceClause above.
-      // complianceClause(spec.rules),
     ].join('\n');
   }
 
@@ -171,17 +159,6 @@ const buildSpecPrompt = (
     '</document>',
     spec.structure,
     'The <document> block is the ENTIRE reply — output nothing else.',
-    // TODO(compliance): regular-mode compliance is DISABLED (see complianceClause
-    // above). A DOCUMENT WORK reply no longer appends a <compliance> envelope, and
-    // the separate AUDIT option has been removed, so a normal canvas session never
-    // runs compliance. Compliance is produced only by the explicitly-selected
-    // compliance agent. To re-enable, restore here:
-    //   complianceClause(spec.rules),
-    //   'The <document> block followed by the <compliance> envelope is the ENTIRE reply — output nothing else.',
-    //   '',
-    //   `2. AUDIT — choose this ONLY when the user asks you to CHECK, REVIEW, VALIDATE or "run/check compliance" on the ${spec.artifact} and does NOT ask you to change/correct/add/improve it (those are DOCUMENT WORK). Reply with ONLY the compliance envelope:`,
-    //   complianceClause(spec.rules),
-    //   'Output the <compliance> envelope as the ENTIRE reply — no <document>, no preamble, no commentary.',
     '',
     '2. Otherwise (a question, advice, brainstorming, or general chat with no instruction to change the canvas), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> tags. You may refer to the document content above. If you are unsure whether the user wanted the canvas updated, answer in chat and ask.',
   ].join('\n');

@@ -47,6 +47,17 @@ try {
     document.documentElement.classList.add('os-embedded');
 
     const parentOrigin = import.meta.env.VITE_OUTERSCORE_PARENT_ORIGIN || '';
+    if (!parentOrigin) {
+      // Build-time var (inlined by Vite). Unset means the postMessage bridge
+      // trusts ANY embedder for inbound messages (incl. fake SSO tokens) and
+      // posts to '*' outbound — acceptable only for local dev. Surface it loudly
+      // so a deployment that forgot the --build-arg can't ship silently.
+      console.error(
+        '[outerscore] VITE_OUTERSCORE_PARENT_ORIGIN is not set — the iframe will accept ' +
+          'postMessage from any origin and post to "*". This is unsafe; set it at build time ' +
+          '(docker build --build-arg VITE_OUTERSCORE_PARENT_ORIGIN=…) for any non-local deployment.',
+      );
+    }
 
     window.addEventListener('message', (event) => {
       if (parentOrigin && event.origin !== parentOrigin) {

@@ -49,6 +49,8 @@ services:
       - OUTERSCORE_TOKEN_KEY_URL=${OUTERSCORE_TOKEN_KEY_URL}
       - OUTERSCORE_JWT_ISSUER=${OUTERSCORE_JWT_ISSUER:-}
       - OUTERSCORE_JWT_AUDIENCE=${OUTERSCORE_JWT_AUDIENCE:-}
+      # Set to true (with both claims above) to reject logins missing iss/aud.
+      - OUTERSCORE_JWT_ENFORCE_CLAIMS=${OUTERSCORE_JWT_ENFORCE_CLAIMS:-false}
       # Example LLM keys — add the ones you use. Leave blank to disable.
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}

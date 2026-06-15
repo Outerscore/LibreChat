@@ -109,12 +109,26 @@ describe('verifyOuterscoreToken', () => {
     expect(payload.user.id).toBe('os-user-1');
   });
 
-  it('does not throw and still verifies when requireIssuerAudience is set without issuer/audience', async () => {
-    // Missing iss/aud only warns (logged) — it must not reject the login.
+  it('throws when requireIssuerAudience is set but issuer/audience are missing', async () => {
+    // Production marks iss/aud required: a missing pair must reject the login
+    // rather than fall back to accepting any token signed by the same key.
     mockTokenKey();
     const token = sign(basePayload);
+    await expect(
+      verifyOuterscoreToken(token, {
+        tokenKeyUrl: TOKEN_KEY_URL,
+        requireIssuerAudience: true,
+      }),
+    ).rejects.toThrow(/must both be set/);
+  });
+
+  it('verifies when requireIssuerAudience is set and both issuer and audience are provided', async () => {
+    mockTokenKey();
+    const token = sign({ ...basePayload, iss: 'outerscore', aud: 'librechat' });
     const payload = await verifyOuterscoreToken(token, {
       tokenKeyUrl: TOKEN_KEY_URL,
+      issuer: 'outerscore',
+      audience: 'librechat',
       requireIssuerAudience: true,
     });
     expect(payload.user.id).toBe('os-user-1');

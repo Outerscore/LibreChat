@@ -12,7 +12,7 @@ jest.mock('~/config/paths', () => ({
   imageOutput: mockTestDir,
 }));
 
-describe.skip('Static Route Integration', () => {
+describe('Static Route Integration', () => {
   let app;
   let staticRoute;
   let testDir;

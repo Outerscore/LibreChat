@@ -133,8 +133,9 @@ Outerscore app (parent)        LibreChat iframe (React)        LibreChat backend
 |---|---|---|
 | `OUTERSCORE_SSO_ENABLED` | backend | `true` enables `POST /api/auth/outerscore` |
 | `OUTERSCORE_TOKEN_KEY_URL` | backend | URL of the RS256 **public** key (Spring `/oauth/token_key`) |
-| `OUTERSCORE_JWT_ISSUER` | backend (optional) | enforce `iss` |
-| `OUTERSCORE_JWT_AUDIENCE` | backend (optional) | enforce `aud` |
+| `OUTERSCORE_JWT_ISSUER` | backend (recommended) | when set, the `iss` claim is verified |
+| `OUTERSCORE_JWT_AUDIENCE` | backend (recommended) | when set, the `aud` claim is verified |
+| `OUTERSCORE_JWT_ENFORCE_CLAIMS` | backend (optional) | `true` = **reject** logins whose token is missing iss/aud (fail-closed); default accepts on signature alone with a one-time warning. Not tied to `NODE_ENV` |
 | `VITE_OUTERSCORE_PARENT_ORIGIN` | **build-time** | origin allowed to postMessage / receive our messages |
 | `JWT_SECRET` | backend | signs/verifies the LibreChat access token |
 | `JWT_REFRESH_SECRET` | backend | signs/verifies the LibreChat refresh token |

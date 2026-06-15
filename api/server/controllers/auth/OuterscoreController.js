@@ -30,9 +30,13 @@ const outerscoreBridgeController = async (req, res) => {
       issuer: process.env.OUTERSCORE_JWT_ISSUER || undefined,
       audience: process.env.OUTERSCORE_JWT_AUDIENCE || undefined,
       // The signed iss/aud are the trust anchor (accounts are keyed on user.id
-      // alone), so require them in production: without them a token minted for
-      // another service with the same signing key would bridge to an account.
-      requireIssuerAudience: process.env.NODE_ENV === 'production',
+      // alone). Enforcing them is an explicit, opt-in hardening — set
+      // OUTERSCORE_JWT_ENFORCE_CLAIMS=true (plus both claim values) to REJECT a
+      // login when iss/aud are missing. It is deliberately NOT tied to NODE_ENV:
+      // `npm run backend` sets NODE_ENV=production even for local/demo runs, so a
+      // NODE_ENV trigger would break SSO out of the box. Default (flag unset):
+      // verify on signature alone, with a one-time warning logged.
+      requireIssuerAudience: process.env.OUTERSCORE_JWT_ENFORCE_CLAIMS === 'true',
     });
   } catch (err) {
     logger.warn('[outerscore] token verification failed:', {
@@ -64,6 +68,10 @@ const outerscoreBridgeController = async (req, res) => {
     let user = await findUser({ outerscoreId: claim.id });
 
     if (user) {
+      // Refresh display fields from the token, but intentionally NOT `email`:
+      // the account is keyed on outerscoreId, and the local email is only a
+      // human-readable label / unique-index guard — leaving it stable avoids a
+      // surprise unique-index collision if the user's Outerscore email changes.
       const patch = {};
       const expectedName = [claim.firstName, claim.lastName].filter(Boolean).join(' ').trim();
       if (expectedName && user.name !== expectedName) {

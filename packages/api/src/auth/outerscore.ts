@@ -27,14 +27,18 @@ export interface OuterscoreVerifyOptions {
   audience?: string;
   /**
    * When true, `issuer` and `audience` are mandatory — verification throws if
-   * either is missing. The bridge sets this in production so a token minted for
-   * a different service (same signing key, different `aud`) is rejected; the
-   * signed `iss`/`aud` are the trust anchor, not just the signature.
+   * either is missing (rejecting tokens minted for a different service with the
+   * same signing key). The bridge wires this to the explicit, opt-in env flag
+   * `OUTERSCORE_JWT_ENFORCE_CLAIMS` — deliberately NOT to `NODE_ENV`, since
+   * `npm run backend` runs `NODE_ENV=production` for local/demo too. When false
+   * (default), a missing claim is accepted on signature alone with a one-time
+   * warning rather than a hard failure.
    */
   requireIssuerAudience?: boolean;
 }
 
 interface CachedKey {
+  url: string;
   pem: string;
   fetchedAt: number;
 }
@@ -42,6 +46,8 @@ interface CachedKey {
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const TOKEN_KEY_FETCH_TIMEOUT_MS = 5000;
 let cachedKey: CachedKey | null = null;
+/** Process-lifetime guard so the "no iss/aud" gap warns once, not per request. */
+let warnedMissingClaims = false;
 
 interface TokenKeyResponse {
   alg?: string;
@@ -73,11 +79,13 @@ async function fetchTokenKey(url: string): Promise<string> {
 
 export async function getOuterscorePublicKey(tokenKeyUrl: string): Promise<string> {
   const now = Date.now();
-  if (cachedKey && now - cachedKey.fetchedAt < CACHE_TTL_MS) {
+  // Key the cache by URL too: a changed `tokenKeyUrl` must never return a key
+  // that was fetched from the previous endpoint.
+  if (cachedKey && cachedKey.url === tokenKeyUrl && now - cachedKey.fetchedAt < CACHE_TTL_MS) {
     return cachedKey.pem;
   }
   const pem = await fetchTokenKey(tokenKeyUrl);
-  cachedKey = { pem, fetchedAt: now };
+  cachedKey = { url: tokenKeyUrl, pem, fetchedAt: now };
   return pem;
 }
 
@@ -92,15 +100,32 @@ export async function verifyOuterscoreToken(
   const opts: OuterscoreVerifyOptions =
     typeof options === 'string' ? { tokenKeyUrl: options } : options;
 
-  // In production the signed iss/aud are the intended trust anchor (accounts are
-  // keyed on user.id alone). Warn loudly when they're not configured rather than
-  // refusing the login — so an interim shared-key deployment keeps working while
-  // the gap stays visible in the logs. Set both env vars to make it enforced.
-  if (opts.requireIssuerAudience && (!opts.issuer || !opts.audience)) {
-    logger.warn(
-      '[outerscore] OUTERSCORE_JWT_ISSUER / OUTERSCORE_JWT_AUDIENCE are not set in production — ' +
-        'tokens are accepted on signature alone. Set both to reject tokens minted for other services.',
-    );
+  // The signed iss/aud are the trust anchor (accounts are keyed on user.id
+  // alone). When the caller opts into enforcement, a missing issuer/audience is
+  // a hard failure — refuse to verify on signature alone, otherwise any token
+  // minted by the same signing key for a different service/audience would bridge
+  // to a LibreChat account. When NOT enforcing, accept on signature alone (so a
+  // demo / interim shared-key deployment keeps working) but warn once so the gap
+  // is visible. Either way, configure both claims and set the enforce flag.
+  if (!opts.issuer || !opts.audience) {
+    if (opts.requireIssuerAudience) {
+      logger.error(
+        '[outerscore] OUTERSCORE_JWT_ISSUER / OUTERSCORE_JWT_AUDIENCE are not set while ' +
+          'OUTERSCORE_JWT_ENFORCE_CLAIMS is on — rejecting the login instead of accepting on signature alone.',
+      );
+      throw new Error(
+        '[outerscore] OUTERSCORE_JWT_ISSUER and OUTERSCORE_JWT_AUDIENCE must both be set when ' +
+          'OUTERSCORE_JWT_ENFORCE_CLAIMS=true. Refusing to verify on signature alone.',
+      );
+    }
+    if (!warnedMissingClaims) {
+      warnedMissingClaims = true;
+      logger.warn(
+        '[outerscore] OUTERSCORE_JWT_ISSUER / OUTERSCORE_JWT_AUDIENCE are not set — tokens are ' +
+          'accepted on signature alone. Set both and OUTERSCORE_JWT_ENFORCE_CLAIMS=true to reject ' +
+          'tokens minted for other services with the same signing key.',
+      );
+    }
   }
 
   const verifyOptions: jwt.VerifyOptions = { algorithms: ['RS256'] };
