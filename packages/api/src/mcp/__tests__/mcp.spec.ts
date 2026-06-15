@@ -41,6 +41,10 @@ describe('Environment Variable Extraction (MCP)', () => {
       ...originalEnv,
       TEST_API_KEY: 'test-api-key-value',
       ANOTHER_SECRET: 'another-secret-value',
+      // Windows' process.env is case-insensitive (the key is `Path`); a plain
+      // object spread loses that, leaving `process.env.PATH` undefined. Restore
+      // an explicit uppercase PATH so the ${PATH} substitution test is portable.
+      PATH: originalEnv.PATH,
     };
   });
 

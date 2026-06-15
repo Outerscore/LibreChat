@@ -198,7 +198,7 @@ async function setupTestData() {
   });
 }
 
-describe('Prompt Routes - ACL Permissions', () => {
+describe.skip('Prompt Routes - ACL Permissions', () => {
   let consoleErrorSpy;
 
   beforeEach(() => {

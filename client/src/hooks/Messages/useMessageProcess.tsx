@@ -48,11 +48,11 @@ export default function useMessageProcess({ message }: { message?: TMessage | nu
       textKey !== latestText.current ||
       (convoId != null && previousConvoId != null && convoId !== previousConvoId)
     ) {
-      logger.log('latest_message', '[useMessageProcess] Setting latest message; logInfo:', logInfo);
+      // logger.log('latest_message', '[useMessageProcess] Setting latest message; logInfo:', logInfo);
       latestText.current = textKey;
       setLatestMessage({ ...message });
     } else {
-      logger.log('latest_message', 'No change in latest message; logInfo', logInfo);
+      // logger.log('latest_message', 'No change in latest message; logInfo', logInfo);
     }
   }, [hasNoChildren, message, setLatestMessage, conversation?.conversationId]);
 

@@ -59,7 +59,11 @@ describe('loadServiceKey', () => {
     });
 
     const result = await loadServiceKey(filePath);
-    expect(readFileAsString).toHaveBeenCalledWith(path.resolve(filePath));
+    // Mirror the impl: an already-absolute path is passed through unchanged
+    // (path.resolve would prepend a drive letter on Windows).
+    expect(readFileAsString).toHaveBeenCalledWith(
+      path.isAbsolute(filePath) ? filePath : path.resolve(filePath),
+    );
     expect(result).toEqual(mockServiceKey);
   });
 

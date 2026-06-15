@@ -19,10 +19,18 @@ const originalEnv = {
 process.env.CREDS_KEY = '0123456789abcdef0123456789abcdef';
 process.env.CREDS_IV = '0123456789abcdef';
 
-/** Skip tests if ANTHROPIC_API_KEY is not available */
-const SKIP_INTEGRATION_TESTS = !process.env.ANTHROPIC_API_KEY;
+/**
+ * These are live Anthropic API integration tests. They are skipped by default —
+ * they hit the real API and require Jest's `--experimental-vm-modules` (the
+ * Responses route uses a dynamic import). Opt in explicitly with
+ * RUN_RESPONSES_INTEGRATION=true and a valid ANTHROPIC_API_KEY.
+ */
+const SKIP_INTEGRATION_TESTS =
+  process.env.RUN_RESPONSES_INTEGRATION !== 'true' || !process.env.ANTHROPIC_API_KEY;
 if (SKIP_INTEGRATION_TESTS) {
-  console.warn('ANTHROPIC_API_KEY not found - skipping integration tests');
+  console.warn(
+    'Skipping Open Responses API integration tests (set RUN_RESPONSES_INTEGRATION=true with ANTHROPIC_API_KEY to run them)',
+  );
 }
 
 jest.mock('meilisearch', () => ({

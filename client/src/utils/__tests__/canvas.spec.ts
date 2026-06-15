@@ -4,6 +4,7 @@ import {
   detectCanvasIntent,
   extractDocBody,
   extractMessageText,
+  formatComplianceReply,
   isComplianceOnlyReply,
   getCanvasMode,
   isDocumentReplyText,
@@ -16,6 +17,7 @@ import {
   shouldMaskCanvasReply,
   stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
+  NO_COMPLIANCE_FINDINGS_TEXT,
 } from '../canvas';
 
 const PAGE_KEY = 'outerscore:page';
@@ -75,9 +77,7 @@ describe('canvas — user mode & routing', () => {
 
     it('flags replies carrying a <document> tag or a compliance envelope', () => {
       expect(isDocumentReplyText('Sure!\n<document>\nBody\n</document>')).toBe(true);
-      expect(
-        isDocumentReplyText('Body\n<compliance>{"findings":[]}</compliance>'),
-      ).toBe(true);
+      expect(isDocumentReplyText('Body\n<compliance>{"findings":[]}</compliance>')).toBe(true);
     });
 
     it('does not flag a plain chat reply or empty text', () => {
@@ -102,9 +102,7 @@ describe('canvas — user mode & routing', () => {
     it("does not mask a doc-shaped reply in 'chat' mode — nothing was written to the canvas", () => {
       setCanvasMode('chat');
       expect(shouldMaskCanvasReply('<document>Body</document>')).toBe(false);
-      expect(
-        shouldMaskCanvasReply('Answer\n<compliance>{"findings":[]}</compliance>'),
-      ).toBe(false);
+      expect(shouldMaskCanvasReply('Answer\n<compliance>{"findings":[]}</compliance>')).toBe(false);
     });
 
     it("does NOT retroactively mask earlier chat turns in 'document' mode", () => {
@@ -124,9 +122,9 @@ describe('canvas — user mode & routing', () => {
     it("masks a committed document turn in 'document' mode via its recorded id", () => {
       setCanvasMode('document');
       markMessageAsCanvasDoc('msg-doc-mode-1');
-      expect(shouldMaskCanvasReply('Untagged markdown that IS the document', 'msg-doc-mode-1')).toBe(
-        true,
-      );
+      expect(
+        shouldMaskCanvasReply('Untagged markdown that IS the document', 'msg-doc-mode-1'),
+      ).toBe(true);
     });
 
     it('keeps masking a marker-less doc reply after a mode switch via its recorded id', () => {
@@ -191,6 +189,22 @@ describe('canvas — user mode & routing', () => {
       expect(prompt).toContain('<document>');
     });
 
+    it('does NOT run compliance in regular canvas mode (disabled — agent-only)', () => {
+      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
+      // intent ('auto'), always ('document') and chat modes must all be free of
+      // any compliance/audit instruction — compliance is produced only by the
+      // explicitly-selected compliance agent.
+      const intentPrompt = buildCanvasSystemPrompt();
+      expect(intentPrompt).not.toContain('<compliance>');
+      expect(intentPrompt).not.toContain('AUDIT');
+
+      setCanvasMode('document');
+      expect(buildCanvasSystemPrompt()).not.toContain('<compliance>');
+
+      setCanvasMode('chat');
+      expect(buildCanvasSystemPrompt()).not.toContain('<compliance>');
+    });
+
     it("instructs a chat-only reply (no tags) in 'chat' mode", () => {
       sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
       setCanvasMode('chat');
@@ -218,21 +232,12 @@ describe('canvas — user mode & routing', () => {
       expect(prompt).toContain('called the "canvas"');
     });
 
-    it("offers an AUDIT branch (check/review only, not change) in 'auto' mode", () => {
-      sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
-      const prompt = buildCanvasSystemPrompt();
-      expect(prompt).toContain('AUDIT');
-      expect(prompt).toContain('does NOT ask you to change');
-      expect(prompt).toContain('<compliance>');
-    });
-
-    it("lists change verbs (correct/fix/add) under DOCUMENT WORK so they aren't audited", () => {
+    it('lists change verbs (correct/fix/improve) under DOCUMENT WORK', () => {
       sessionStorage.setItem(PAGE_KEY, 'sow-project-brief');
       const prompt = buildCanvasSystemPrompt();
       expect(prompt).toContain('CORRECT');
       expect(prompt).toContain('ADD TO');
-      // The disambiguation rule must steer change requests to DOCUMENT WORK.
-      expect(prompt).toContain('choose DOCUMENT WORK');
+      expect(prompt).toContain('IMPROVE');
     });
 
     it('injects document context only (no rules/intent) when an agent is active', () => {
@@ -264,6 +269,33 @@ describe('canvas — isComplianceOnlyReply', () => {
   it('is false for a plain chat reply or empty text', () => {
     expect(isComplianceOnlyReply('A fair day rate depends on…')).toBe(false);
     expect(isComplianceOnlyReply('')).toBe(false);
+  });
+});
+
+describe('canvas — formatComplianceReply', () => {
+  it('renders the all-clear message for an empty envelope (no raw JSON)', () => {
+    const result = formatComplianceReply('<compliance>{"findings":[]}</compliance>');
+    expect(result).toBe(NO_COMPLIANCE_FINDINGS_TEXT);
+    expect(result).not.toContain('<compliance>');
+    expect(result).not.toContain('findings');
+  });
+
+  it('renders a readable markdown list with severity, reason, span and suggestion', () => {
+    const reply =
+      '<compliance>{"findings":[{"text":"under 40","severity":"HIGH","reason":"age discrimination","suggestion":"remove the age requirement"}]}</compliance>';
+    const result = formatComplianceReply(reply);
+    expect(result).toContain('1 compliance issue found');
+    expect(result).toContain('**HIGH**');
+    expect(result).toContain('age discrimination');
+    expect(result).toContain('under 40');
+    expect(result).toContain('remove the age requirement');
+    expect(result).not.toContain('<compliance>');
+  });
+
+  it('pluralizes the heading for multiple findings', () => {
+    const reply =
+      '<compliance>{"findings":[{"text":"a","severity":"LOW","reason":"r1"},{"text":"b","severity":"MODERATE","reason":"r2"}]}</compliance>';
+    expect(formatComplianceReply(reply)).toContain('2 compliance issues found');
   });
 });
 
@@ -301,8 +333,7 @@ describe('canvas — host-bound stream parsing', () => {
     });
 
     it('strips a trailing compliance envelope from the body', () => {
-      const reply =
-        '<document>\nBody text\n</document><compliance>{"findings":[]}</compliance>';
+      const reply = '<document>\nBody text\n</document><compliance>{"findings":[]}</compliance>';
       expect(extractDocBody(reply)).toBe('Body text');
     });
 
@@ -329,9 +360,7 @@ describe('canvas — host-bound stream parsing', () => {
       const text =
         'Body text\n<compliance>{"findings":[{"text":"ASAP","severity":"high","reason":"vague deadline"}]}</compliance>';
       const { findings, stripped } = parseComplianceEnvelope(text);
-      expect(findings).toEqual([
-        { text: 'ASAP', severity: 'HIGH', reason: 'vague deadline' },
-      ]);
+      expect(findings).toEqual([{ text: 'ASAP', severity: 'HIGH', reason: 'vague deadline' }]);
       expect(stripped).toBe('Body text');
     });
 

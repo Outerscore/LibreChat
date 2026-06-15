@@ -88,11 +88,11 @@ const useNavigateToConvo = (index = 0) => {
       return;
     }
     const { resetLatestMessage = true, currentConvoId } = options || {};
-    logger.log('conversation', 'Navigating to conversation', conversation);
+    // logger.log('conversation', 'Navigating to conversation', conversation);
     hasSetConversation.current = true;
     setSubmission(null);
     if (resetLatestMessage) {
-      logger.log('latest_message', 'Clearing all latest messages');
+      // logger.log('latest_message', 'Clearing all latest messages');
       clearAllLatestMessages();
     }
 

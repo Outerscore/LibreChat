@@ -226,7 +226,7 @@ const useNewConvo = (index = 0) => {
         }
         setSubmission({} as TSubmission);
         if (!(keepLatestMessage ?? false)) {
-          logger.log('latest_message', 'Clearing all latest messages');
+          // logger.log('latest_message', 'Clearing all latest messages');
           clearAllLatestMessages();
         }
         if (isCancelled) {

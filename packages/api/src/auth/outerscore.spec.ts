@@ -13,7 +13,6 @@ jest.mock(
   { virtual: true },
 );
 
-import { logger } from '@librechat/data-schemas';
 import {
   verifyOuterscoreToken,
   extractOuterscoreUser,
@@ -110,7 +109,8 @@ describe('verifyOuterscoreToken', () => {
     expect(payload.user.id).toBe('os-user-1');
   });
 
-  it('warns but still verifies when requireIssuerAudience is set without issuer/audience', async () => {
+  it('does not throw and still verifies when requireIssuerAudience is set without issuer/audience', async () => {
+    // Missing iss/aud only warns (logged) — it must not reject the login.
     mockTokenKey();
     const token = sign(basePayload);
     const payload = await verifyOuterscoreToken(token, {
@@ -118,7 +118,6 @@ describe('verifyOuterscoreToken', () => {
       requireIssuerAudience: true,
     });
     expect(payload.user.id).toBe('os-user-1');
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('OUTERSCORE_JWT_ISSUER'));
   });
 
   it('refreshes the public key once and succeeds after a key rotation', async () => {

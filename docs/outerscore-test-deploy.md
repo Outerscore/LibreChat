@@ -9,7 +9,9 @@ This is the complete, step-by-step guide to running the AI chat (LibreChat fork)
 > Each step below is tagged with **WHERE** it runs. A copy-paste summary for the server person
 > is in [§9](#9-hand-off-for-the-server-admin).
 >
-> For how login/SSO works once it's deployed, see [`outerscore-auth.md`](./outerscore-auth.md).
+> For the branch model (which branch deploys where, and pulling LibreChat updates) see
+> [`outerscore-branching.md`](./outerscore-branching.md); for how login/SSO works once deployed
+> see [`outerscore-auth.md`](./outerscore-auth.md).
 
 ---
 

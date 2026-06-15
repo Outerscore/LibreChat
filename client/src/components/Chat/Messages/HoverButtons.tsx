@@ -246,14 +246,14 @@ const HoverButtons = ({
         )}
       />
 
-      {/* Send to Canvas Button — hidden once a reply was already written to the
-          canvas (masked as the "written to canvas" indicator): there is nothing
-          meaningful left to send, only the placeholder. */}
+      {/* Send to Canvas Button — only on a canvas page (an editor/drawer to send
+          to); never in a regular embedded chat. Also hidden once a reply was
+          already written to the canvas (masked as the "written to canvas"
+          indicator): there is nothing meaningful left to send, only the placeholder. */}
       {!isCreatedByUser &&
         isInIframe &&
-        !(
-          isOnCanvasPage() && shouldMaskCanvasReply(extractMessageText(message), message.messageId)
-        ) && (
+        isOnCanvasPage() &&
+        !shouldMaskCanvasReply(extractMessageText(message), message.messageId) && (
           <HoverButton
             onClick={() => sendToCanvas(message)}
             title={localize('com_ui_send_to_canvas')}

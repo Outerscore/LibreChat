@@ -31,6 +31,7 @@ import {
   detectCanvasIntent,
   extractDocBody,
   extractMessageText,
+  formatComplianceReply,
   isComplianceOnlyReply,
   isOnCanvasPage,
   markMessageAsCanvasDoc,
@@ -41,6 +42,7 @@ import {
   stripCanvasEnvelopes,
   CANVAS_PLACEHOLDER_TEXT,
   COMPLIANCE_SUMMARY_TEXT,
+  NO_COMPLIANCE_FINDINGS_TEXT,
 } from '~/utils/canvas';
 import store from '~/store';
 
@@ -308,32 +310,43 @@ export default function useResumableSSE(
               // Only a document reply drives the canvas; a normal chat reply is
               // left in the thread untouched (no stream-end, no placeholder).
               if (canvasIntent === 'yes') {
-                const { findings } = parseComplianceEnvelope(rawText);
+                // TODO(compliance): regular-mode compliance disabled — a document
+                // write no longer forwards findings (they referenced the pre-edit
+                // content and mismatched the editor highlights). Compliance is
+                // produced only by the explicitly-selected compliance agent
+                // (handled by the audit path below).
+                // const { findings } = parseComplianceEnvelope(rawText);
                 const body = extractDocBody(rawText);
                 // Never clobber the editor with an empty body (weak/aborted replies).
                 if (body.length > 0) {
                   postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
-                  postToCanvas({ type: 'outerscore:compliance-result', findings });
+                  // postToCanvas({ type: 'outerscore:compliance-result', findings });
                   replaceLastAssistantWithCanvasPlaceholder();
                   postToCanvas({ type: 'outerscore:canvas-complete' });
                 }
               }
             }
-            // Audit reply (a <compliance> envelope, no <document>): route findings
-            // to the host panel and strip the envelope from the chat bubble. Runs
-            // on any canvas page regardless of the chat/document toggle — findings
-            // are not a canvas write — but NOT in always-mode, where the whole
-            // reply IS the document (handled above). Read the message directly:
-            // rawText is only populated when shouldPostToCanvas is true.
-            if (isInIframe && isOnCanvasPage() && !alwaysDocument) {
+            // Audit reply (a <compliance> envelope, no <document>): the raw JSON
+            // must never remain in the chat bubble. On a canvas page the findings
+            // drive the host panel + editor highlights, so the bubble just points
+            // there; in a regular chat (no panel) they are rendered readably in
+            // the bubble. Skipped in always-mode (the whole reply is the document).
+            if (!alwaysDocument) {
               const msgs = getMessages() ?? [];
               const last = msgs[msgs.length - 1];
               const replyText = last && !last.isCreatedByUser ? extractMessageText(last) : '';
               if (isComplianceOnlyReply(replyText)) {
                 const { findings } = parseComplianceEnvelope(replyText);
-                postToParent({ type: 'outerscore:compliance-result', findings });
-                const stripped = stripCanvasEnvelopes(replyText);
-                replaceLastAssistantText(stripped || COMPLIANCE_SUMMARY_TEXT);
+                if (isInIframe && isOnCanvasPage()) {
+                  postToParent({ type: 'outerscore:compliance-result', findings });
+                  const stripped = stripCanvasEnvelopes(replyText);
+                  replaceLastAssistantText(
+                    stripped ||
+                      (findings.length > 0 ? COMPLIANCE_SUMMARY_TEXT : NO_COMPLIANCE_FINDINGS_TEXT),
+                  );
+                } else {
+                  replaceLastAssistantText(formatComplianceReply(replyText));
+                }
               }
             }
             sse.close();

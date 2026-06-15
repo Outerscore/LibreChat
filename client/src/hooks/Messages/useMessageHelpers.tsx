@@ -68,11 +68,11 @@ export default function useMessageHelpers(props: TMessageProps) {
       textKey !== latestText.current ||
       (convoId != null && previousConvoId != null && convoId !== previousConvoId)
     ) {
-      logger.log('latest_message', '[useMessageHelpers] Setting latest message: ', logInfo);
+      // logger.log('latest_message', '[useMessageHelpers] Setting latest message: ', logInfo);
       latestText.current = textKey;
       setLatestMessage({ ...message });
     } else {
-      logger.log('latest_message', 'No change in latest message', logInfo);
+      // logger.log('latest_message', 'No change in latest message', logInfo);
     }
   }, [isLast, message, setLatestMessage, conversation?.conversationId]);
 

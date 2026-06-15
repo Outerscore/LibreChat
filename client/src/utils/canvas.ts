@@ -66,30 +66,42 @@ interface CanvasSpec {
   rules: string[];
 }
 
-/**
- * Compliance envelope spec — appended *inside* a document reply only. Findings
- * may include an optional `suggestion`; the host renders an "Apply fix" button
- * only when one is present, so the model is told to add it only when a single
- * document-ready rewrite is the right fix.
+/*
+ * TODO(compliance): regular-mode compliance is DISABLED for now.
+ *
+ * Auto-running compliance inside a normal canvas reply was both confusing and
+ * buggy: asking to "improve the brief" made the model rewrite AND audit in the
+ * same turn, so the findings referenced the PRE-EDIT content it was given and
+ * the host could not match those spans against the freshly-replaced editor.
+ *
+ * Compliance is now produced ONLY by the explicitly-selected compliance agent
+ * (a specific agent with a specific prompt, seeded server-side in
+ * api/server/services/Outerscore/complianceAgents.js). The SSE audit path still
+ * parses/forwards that agent's <compliance> envelope.
+ *
+ * To re-enable regular-mode compliance, uncomment this clause + its call sites
+ * and the AUDIT branch in buildSpecPrompt below, plus the document-path
+ * forwarding in useSSE.ts / useResumableSSE.ts.
  */
-const complianceClause = (rules: string[]): string =>
-  [
-    'Immediately after </document>, append a single compliance envelope and nothing else:',
-    '<compliance>{"findings":[{"text":"<verbatim span from the document>","severity":"HIGH|MODERATE|LOW","reason":"<short explanation>","suggestion":"<optional replacement — omit when the right fix is to delete or rewrite from scratch>"}]}</compliance>',
-    'Keep each suggestion under 600 characters and write it so it can replace the flagged span in place. If there is nothing to flag, append <compliance>{"findings":[]}</compliance>.',
-    'Check the document against these rules:',
-    ...rules.map((r) => `- ${r}`),
-  ].join('\n');
+// const complianceClause = (rules: string[]): string =>
+//   [
+//     'Immediately after </document>, append a single compliance envelope and nothing else:',
+//     '<compliance>{"findings":[{"text":"<verbatim span from the document>","severity":"HIGH|MODERATE|LOW","reason":"<short explanation>","suggestion":"<optional replacement — omit when the right fix is to delete or rewrite from scratch>"}]}</compliance>',
+//     'Keep each suggestion under 600 characters and write it so it can replace the flagged span in place. If there is nothing to flag, append <compliance>{"findings":[]}</compliance>.',
+//     'Check the document against these rules:',
+//     ...rules.map((r) => `- ${r}`),
+//   ].join('\n');
 
 /**
  * Intent-aware canvas system prompt. The model decides, per turn, whether the
  * user is asking for document work or just chatting:
- *  - document work  → reply is ONLY `<document>…</document>` + `<compliance>…`,
- *    which the host streams into the editor canvas;
+ *  - document work  → reply is ONLY `<document>…</document>`, which the host
+ *    streams into the editor canvas;
  *  - anything else  → a normal chat reply with no tags, which stays in the chat.
  *
- * Returned as *system* instructions so the document + rules never appear in the
- * visible user message.
+ * Compliance is intentionally NOT part of this prompt — see the TODO on
+ * `complianceClause` above. Returned as *system* instructions so the document
+ * never appears in the visible user message.
  */
 const buildSpecPrompt = (
   spec: CanvasSpec,
@@ -124,7 +136,7 @@ const buildSpecPrompt = (
   if (routing === 'chat') {
     return [
       ...context,
-      `Reply as a helpful assistant in plain Markdown. You may quote or refer to the ${spec.artifact} content above, but do NOT output a rewritten ${spec.artifact} and never use <document> or <compliance> tags — the user has chat-only mode enabled and your reply stays in the chat.`,
+      `Reply as a helpful assistant in plain Markdown. You may quote or refer to the ${spec.artifact} content above, but do NOT output a rewritten ${spec.artifact} and never use <document> tags — the user has chat-only mode enabled and your reply stays in the chat.`,
     ].join('\n');
   }
 
@@ -137,7 +149,8 @@ const buildSpecPrompt = (
       ...context,
       `Treat the user's message as an instruction to create or revise the ${spec.artifact}. Reply with the COMPLETE updated ${spec.artifact} in Markdown — no preamble, no commentary, no code fences.`,
       spec.structure,
-      complianceClause(spec.rules),
+      // TODO(compliance): regular-mode compliance disabled — see complianceClause above.
+      // complianceClause(spec.rules),
     ].join('\n');
   }
 
@@ -157,14 +170,20 @@ const buildSpecPrompt = (
     '...the full document in Markdown — no preamble, no commentary, no code fences...',
     '</document>',
     spec.structure,
-    complianceClause(spec.rules),
-    'The <document> block followed by the <compliance> envelope is the ENTIRE reply — output nothing else.',
+    'The <document> block is the ENTIRE reply — output nothing else.',
+    // TODO(compliance): regular-mode compliance is DISABLED (see complianceClause
+    // above). A DOCUMENT WORK reply no longer appends a <compliance> envelope, and
+    // the separate AUDIT option has been removed, so a normal canvas session never
+    // runs compliance. Compliance is produced only by the explicitly-selected
+    // compliance agent. To re-enable, restore here:
+    //   complianceClause(spec.rules),
+    //   'The <document> block followed by the <compliance> envelope is the ENTIRE reply — output nothing else.',
+    //   '',
+    //   `2. AUDIT — choose this ONLY when the user asks you to CHECK, REVIEW, VALIDATE or "run/check compliance" on the ${spec.artifact} and does NOT ask you to change/correct/add/improve it (those are DOCUMENT WORK). Reply with ONLY the compliance envelope:`,
+    //   complianceClause(spec.rules),
+    //   'Output the <compliance> envelope as the ENTIRE reply — no <document>, no preamble, no commentary.',
     '',
-    `2. AUDIT — choose this ONLY when the user asks you to CHECK, REVIEW, VALIDATE or "run/check compliance" on the ${spec.artifact} and does NOT ask you to change, correct, add to, or improve it. If the message contains ANY instruction to modify the document (correct, fix, add, rewrite, improve, etc.), it is DOCUMENT WORK (option 1), NOT an audit — when in doubt between auditing and changing, choose DOCUMENT WORK. Do NOT rewrite the document. Reply with ONLY the compliance envelope and nothing else:`,
-    complianceClause(spec.rules),
-    'Output the <compliance> envelope as the ENTIRE reply — no <document>, no preamble, no commentary.',
-    '',
-    '3. Otherwise (a question, advice, brainstorming, or general chat with no instruction to change or check the canvas), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> or <compliance> tags. You may refer to the document content above. If you are unsure whether the user wanted the canvas updated, answer in chat and ask.',
+    '2. Otherwise (a question, advice, brainstorming, or general chat with no instruction to change the canvas), reply normally as a helpful assistant in plain Markdown. Do NOT use <document> tags. You may refer to the document content above. If you are unsure whether the user wanted the canvas updated, answer in chat and ask.',
   ].join('\n');
 };
 
@@ -306,6 +325,37 @@ export const isComplianceOnlyReply = (text: string): boolean => {
 
 /** Short bubble shown in the chat after an audit (findings live in the host panel). */
 export const COMPLIANCE_SUMMARY_TEXT = 'Compliance review complete — see the results panel.';
+
+/** Friendly bubble for a compliance reply with no findings. */
+export const NO_COMPLIANCE_FINDINGS_TEXT = '✅ No compliance issues found.';
+
+/**
+ * Render a compliance-only reply as readable chat markdown. Used in a regular
+ * chat (no host findings panel) so the raw `<compliance>` JSON never shows: an
+ * empty result becomes a friendly "all clear", otherwise a markdown list of the
+ * findings with severity, reason, the flagged span, and any suggested fix.
+ */
+export const formatComplianceReply = (text: string): string => {
+  const { findings } = parseComplianceEnvelope(text);
+  if (findings.length === 0) {
+    return NO_COMPLIANCE_FINDINGS_TEXT;
+  }
+  const heading =
+    findings.length === 1
+      ? '**1 compliance issue found:**'
+      : `**${findings.length} compliance issues found:**`;
+  const items = findings.map((finding) => {
+    let item = `- **${finding.severity}** — ${finding.reason}`;
+    if (finding.text) {
+      item += `\n  > ${finding.text}`;
+    }
+    if (finding.suggestion) {
+      item += `\n  _Suggested fix:_ ${finding.suggestion}`;
+    }
+    return item;
+  });
+  return `${heading}\n\n${items.join('\n')}`;
+};
 
 /**
  * True when an assistant reply's text is document work: the in-session canvas
