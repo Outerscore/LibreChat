@@ -29,6 +29,8 @@ export default function useSubmitMessage() {
         setMessages([...(rootMessages || []), latestMessage]);
       }
 
+      // The editor/page context is injected invisibly as system instructions in
+      // useChatFunctions (promptPrefix); the visible message stays the user's text.
       ask(
         {
           text: data.text,

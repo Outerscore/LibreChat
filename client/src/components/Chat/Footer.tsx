@@ -5,6 +5,8 @@ import { Constants } from 'librechat-data-provider';
 import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 
+const isEmbeddedInIframe = typeof window !== 'undefined' && window.parent !== window;
+
 function Footer({ className }: { className?: string }) {
   const { data: config } = useGetStartupConfig();
   const localize = useLocalize();
@@ -70,6 +72,10 @@ function Footer({ className }: { className?: string }) {
   const footerElements = [...mainContentRender, privacyPolicyRender, termsOfServiceRender].filter(
     Boolean,
   );
+
+  if (isEmbeddedInIframe) {
+    return null;
+  }
 
   return (
     <div className="relative w-full">

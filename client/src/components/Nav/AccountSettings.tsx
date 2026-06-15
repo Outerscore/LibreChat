@@ -1,12 +1,47 @@
 import { useState, memo, useRef } from 'react';
 import * as Menu from '@ariakit/react/menu';
 import { FileText, LogOut } from 'lucide-react';
-import { LinkIcon, GearIcon, DropdownMenuSeparator, Avatar } from '@librechat/client';
+import {
+  Avatar,
+  Button,
+  GearIcon,
+  LinkIcon,
+  TooltipAnchor,
+  DropdownMenuSeparator,
+} from '@librechat/client';
 import { MyFilesModal } from '~/components/Chat/Input/Files/MyFilesModal';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
+import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useLocalize } from '~/hooks';
 import Settings from './Settings';
+
+function SettingsIconButton() {
+  const localize = useLocalize();
+  const [showSettings, setShowSettings] = useState(false);
+
+  return (
+    <>
+      <TooltipAnchor
+        side="right"
+        description={localize('com_nav_settings')}
+        render={
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={localize('com_nav_settings')}
+            data-testid="nav-settings"
+            className="h-9 w-9 rounded-lg text-text-secondary"
+            onClick={() => setShowSettings(true)}
+          >
+            <GearIcon className="h-5 w-5" aria-hidden="true" />
+          </Button>
+        }
+      />
+      {showSettings && <Settings open={showSettings} onOpenChange={setShowSettings} />}
+    </>
+  );
+}
 
 function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const localize = useLocalize();
@@ -18,6 +53,10 @@ function AccountSettings({ collapsed = false }: { collapsed?: boolean }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
   const accountSettingsButtonRef = useRef<HTMLButtonElement>(null);
+
+  if (isOuterscoreContext()) {
+    return <SettingsIconButton />;
+  }
 
   return (
     <Menu.MenuProvider>

@@ -13,6 +13,9 @@
     <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon-180x180.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+    <!-- Outerscore design-system alignment: match the host app font (Roboto). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700&display=swap" rel="stylesheet" />
     <style>
       html,
       body {
@@ -22,6 +25,18 @@
       }
     </style>
     <script>
+      // Outerscore embed: when this LibreChat is rendered inside the Outerscore
+      // app iframe, pin the theme to light BEFORE @librechat/client's
+      // ThemeContext initializes off localStorage. The chat must match the host
+      // re-skin deterministically; a user's prior dark preference shouldn't
+      // bleed through. Standalone LibreChat is unaffected.
+      if (window.parent !== window) {
+        try {
+          localStorage.setItem('color-theme', 'light');
+        } catch (e) { /* localStorage unavailable — fall through */ }
+        document.documentElement.classList.remove('dark');
+      }
+
       const theme = localStorage.getItem('color-theme');
       const loadingContainerStyle = document.createElement('style');
       let backgroundColor;

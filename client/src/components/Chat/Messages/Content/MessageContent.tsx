@@ -5,6 +5,13 @@ import type { TMessage } from 'librechat-data-provider';
 import type { TMessageContentProps, TDisplayProps } from '~/common';
 import Error from '~/components/Messages/Content/Error';
 import { useMessageContext } from '~/Providers';
+import { CanvasWritingIndicator, CanvasDoneIndicator, isCanvas2Mode } from './CanvasStatus';
+import {
+  formatComplianceReply,
+  isComplianceOnlyReply,
+  isComplianceReplyText,
+  shouldMaskCanvasReply,
+} from '~/utils/canvas';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
@@ -167,6 +174,51 @@ const MessageContent = ({
 
   if (edit) {
     return <EditMessage text={text} isSubmitting={isSubmitting} {...props} />;
+  }
+
+  // Canvas page: mask only replies that are document work (routing-aware) — a
+  // chat-mode or intent-routed Q&A reply renders as a normal bubble. A doc turn
+  // streaming under 'intent' flips to the indicator once its <document> tag lands.
+  // Thinking content is NOT masked — only the document text is replaced by the
+  // indicator, the model's thoughts stay readable in the chat.
+  if (
+    !message.isCreatedByUser &&
+    isCanvas2Mode() &&
+    shouldMaskCanvasReply(text, messageId, isLast === true && isSubmitting === true)
+  ) {
+    const inFlight = isSubmitting || (isLast && regularContent.length === 0);
+    return (
+      <>
+        {thinkingContent.length > 0 && (
+          <Thinking key={`thinking-${messageId}`}>{thinkingContent}</Thinking>
+        )}
+        {inFlight ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />}
+      </>
+    );
+  }
+
+  // Compliance reply outside a canvas page (e.g. the compliance agent in a regular
+  // chat): render the findings as readable markdown instead of the raw <compliance>
+  // JSON. While it streams, show the generating indicator rather than a half-written
+  // envelope. Thinking content stays visible.
+  if (!message.isCreatedByUser && !isCanvas2Mode() && isComplianceReplyText(regularContent)) {
+    return (
+      <>
+        {thinkingContent.length > 0 && (
+          <Thinking key={`thinking-${messageId}`}>{thinkingContent}</Thinking>
+        )}
+        {isComplianceOnlyReply(regularContent) ? (
+          <DisplayMessage
+            key={`display-${messageId}`}
+            showCursor={false}
+            text={formatComplianceReply(regularContent)}
+            {...props}
+          />
+        ) : (
+          <CanvasWritingIndicator />
+        )}
+      </>
+    );
   }
 
   return (

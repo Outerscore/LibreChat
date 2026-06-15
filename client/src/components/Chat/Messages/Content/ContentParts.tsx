@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo, useCallback, useEffect, useRef } from 'react';
 import { ContentTypes } from 'librechat-data-provider';
 import type {
   TMessageContentParts,
@@ -9,6 +9,19 @@ import type {
 import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
 import { mapAttachments, groupSequentialToolCalls } from '~/utils';
 import { MessageContext, SearchContext } from '~/Providers';
+import {
+  CanvasWritingIndicator,
+  CanvasDoneIndicator,
+  isCanvas2Mode,
+  postCanvasContent,
+  extractPartsText,
+} from './CanvasStatus';
+import {
+  formatComplianceReply,
+  isComplianceOnlyReply,
+  isComplianceReplyText,
+  shouldMaskCanvasReply,
+} from '~/utils/canvas';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
 import ToolCallGroup from './ToolCallGroup';
@@ -144,6 +157,99 @@ const ContentParts = memo(function ContentParts({
       messageId,
     ],
   );
+
+  const canvasSyncRef = useRef<{
+    content: Array<TMessageContentParts | undefined> | undefined;
+    wasSubmitting: boolean;
+  } | null>(null);
+
+  // Canvas2 mode: keep the canvas in sync with the active (last) assistant message when
+  // it changes outside of live streaming — e.g. switching regenerate siblings.
+  // Three cases are told apart:
+  //  - generation settle (was submitting on the previous run): skipped — the live
+  //    stream-end already committed this body; re-posting raced the host's history
+  //    recording and produced duplicate entries.
+  //  - first run after mount (conversation reopen / message remount): posted with
+  //    initial: true, which the host only applies to an empty editor (no clobber).
+  //  - a real change while mounted (sibling switch): posted normally.
+  useEffect(() => {
+    if (isCreatedByUser || edit === true || !isLast || !isCanvas2Mode()) {
+      return;
+    }
+    const prev = canvasSyncRef.current;
+    canvasSyncRef.current = { content, wasSubmitting: effectiveIsSubmitting };
+    if (effectiveIsSubmitting || prev?.wasSubmitting) {
+      return;
+    }
+    if (prev == null) {
+      postCanvasContent(content, true, messageId);
+      return;
+    }
+    if (prev.content !== content) {
+      postCanvasContent(content, false, messageId);
+    }
+  }, [content, isCreatedByUser, edit, isLast, effectiveIsSubmitting, messageId]);
+
+  // Canvas page: mask only replies that are document work (routing-aware) — a
+  // chat-mode or intent-routed Q&A reply renders as a normal bubble. Edit mode
+  // is exempt. Reasoning/think parts are NOT masked: only the document text is
+  // replaced by the indicator, the model's thoughts stay readable in the chat.
+  if (
+    !isCreatedByUser &&
+    edit !== true &&
+    isCanvas2Mode() &&
+    shouldMaskCanvasReply(extractPartsText(content), messageId, isLast && effectiveIsSubmitting)
+  ) {
+    const thinkParts: PartWithIndex[] = [];
+    content?.forEach((part, idx) => {
+      if (part?.type === ContentTypes.THINK) {
+        thinkParts.push({ part, idx });
+      }
+    });
+    return (
+      <>
+        {thinkParts.map(({ part, idx }) => renderPart(part, idx, false))}
+        {effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />}
+      </>
+    );
+  }
+
+  // Compliance reply outside a canvas page (e.g. the compliance agent in a regular
+  // chat): render the findings as readable markdown instead of the raw <compliance>
+  // JSON. While it is still streaming, show the generating indicator rather than a
+  // half-written envelope. Think parts stay visible; edit mode is exempt.
+  if (
+    !isCreatedByUser &&
+    edit !== true &&
+    !isCanvas2Mode() &&
+    isComplianceReplyText(extractPartsText(content))
+  ) {
+    const partsText = extractPartsText(content);
+    const isComplete = isComplianceOnlyReply(partsText);
+    const thinkParts: PartWithIndex[] = [];
+    content?.forEach((part, idx) => {
+      if (part?.type === ContentTypes.THINK) {
+        thinkParts.push({ part, idx });
+      }
+    });
+    return (
+      <>
+        {thinkParts.map(({ part, idx }) => renderPart(part, idx, false))}
+        {isComplete ? (
+          renderPart(
+            {
+              type: ContentTypes.TEXT,
+              text: formatComplianceReply(partsText),
+            } as TMessageContentParts,
+            content?.length ?? 0,
+            true,
+          )
+        ) : (
+          <CanvasWritingIndicator />
+        )}
+      </>
+    );
+  }
 
   // Early return: no content
   if (!content) {

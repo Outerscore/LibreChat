@@ -9,6 +9,7 @@ import type { ChatFormValues } from '~/common';
 import { ChatContext, AddedChatContext, ChatFormProvider, useFileMapContext } from '~/Providers';
 import { useAddedResponse, useResumeOnLoad, useAdaptiveSSE, useChatHelpers } from '~/hooks';
 import ConversationStarters from './Input/ConversationStarters';
+import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
@@ -65,6 +66,7 @@ function ChatView({ index = 0 }: { index?: number }) {
     (!messagesTree || messagesTree.length === 0) &&
     (conversationId === Constants.NEW_CONVO || !conversationId);
   const isNavigating = (!messagesTree || messagesTree.length === 0) && conversationId != null;
+  const isEmbedded = isOuterscoreContext();
 
   if (isLoading && conversationId !== Constants.NEW_CONVO) {
     content = <LoadingSpinner />;
@@ -100,7 +102,8 @@ function ChatView({ index = 0 }: { index?: number }) {
                     )}
                   >
                     <ChatForm index={index} />
-                    {isLandingPage ? <ConversationStarters /> : <Footer />}
+                    {isLandingPage && !isEmbedded && <ConversationStarters />}
+                    {!isLandingPage && <Footer />}
                   </div>
                 </div>
                 {isLandingPage && <Footer />}

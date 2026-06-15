@@ -1,0 +1,67 @@
+/**
+ * Outerscore palette — fallback for the LibreChat fork.
+ *
+ * The live palette is pushed by the Outerscore host via the `outerscore:theme`
+ * postMessage (see main.jsx) so the embedded chat always matches whatever the
+ * host app is running (including runtime cosmic/classic switches). These
+ * vendored values are only the pre-handshake / standalone fallback, copied from
+ * the host's source of truth (Cosmic defaults):
+ *   outerscore/frontend → projects/outerscore-components-lib/src/lib/styles/tokens/_primitives.scss
+ *
+ * Namespace is `--os-color-*` to match the host's Cosmic design tokens. Keep in
+ * sync if the host primitives are re-baselined. Re-skin only — no layout.
+ */
+
+:root {
+  --os-color-white: #ffffff;
+  --os-color-black: #000000;
+
+  /* Brand — Cosmic Violet */
+  --os-color-brand-25: #f6f4ff;
+  --os-color-brand-50: #ede9ff;
+  --os-color-brand-100: #ddd4ff;
+  --os-color-brand-200: #c3adff;
+  --os-color-brand-300: #a485fd;
+  --os-color-brand-400: #8360f7;
+  --os-color-brand-500: #5f36f5;
+  --os-color-brand-600: #4b22dd;
+  --os-color-brand-700: #3817b3;
+  --os-color-brand-800: #280f88;
+  --os-color-brand-900: #1a0a5f;
+  --os-color-brand-950: #0f0630;
+
+  /* Gray */
+  --os-color-gray-25: #fcfcfd;
+  --os-color-gray-50: #f9fafb;
+  --os-color-gray-100: #f3f4f6;
+  --os-color-gray-200: #e5e7eb;
+  --os-color-gray-300: #d1d5db;
+  --os-color-gray-400: #9ca3af;
+  --os-color-gray-500: #6b7280;
+  --os-color-gray-600: #4b5563;
+  --os-color-gray-700: #374151;
+  --os-color-gray-800: #1f2937;
+  --os-color-gray-900: #111827;
+  --os-color-gray-950: #030712;
+
+  /* Error */
+  --os-color-error-50: #fef2f2;
+  --os-color-error-500: #fb2c36;
+  --os-color-error-600: #e7000b;
+  --os-color-error-700: #c10007;
+
+  /* Warning — Amber */
+  --os-color-warning-50: #fffbeb;
+  --os-color-warning-500: #f59e0b;
+  --os-color-warning-600: #d97706;
+
+  /* Success — Green */
+  --os-color-success-50: #f0fdf4;
+  --os-color-success-500: #22c55e;
+  --os-color-success-600: #16a34a;
+
+  /* Semantic text — mirrors the host's --os-text-* (pushed live via outerscore:theme).
+     Used by outerscore.css so embedded text matches the app instead of pure black. */
+  --os-text-primary: rgba(0, 0, 0, 0.87);
+  --os-text-secondary: var(--os-color-gray-700);
+}

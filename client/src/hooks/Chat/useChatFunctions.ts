@@ -29,6 +29,7 @@ import type { TAskFunction, ExtendedFile } from '~/common';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 import useGetSender from '~/hooks/Conversations/useGetSender';
 import { logger, createDualMessageContent } from '~/utils';
+import { buildCanvasSystemPrompt } from '~/utils/canvas';
 import store, { useGetEphemeralAgent } from '~/store';
 import { startupConfigKey } from '~/data-provider';
 import useUserKey from '~/hooks/Input/useUserKey';
@@ -135,6 +136,20 @@ export default function useChatFunctions({
       });
     }
 
+    // Inject the Outerscore editor/page context as invisible system
+    // instructions so the document + canvas rules reach the model without ever
+    // appearing in the visible user message. Mutates the cloned conversation
+    // only (this turn's payload) — never persisted.
+    // When a dedicated agent is active (e.g. a selected compliance agent), inject
+    // only the document context — the agent owns its own rules/instructions, so the
+    // full canvas rule prompt would duplicate/fight them.
+    const canvasSystemPrompt = buildCanvasSystemPrompt(isAgentsEndpoint(endpoint));
+    if (canvasSystemPrompt && conversation) {
+      conversation.promptPrefix = conversation.promptPrefix
+        ? `${conversation.promptPrefix}\n\n${canvasSystemPrompt}`
+        : canvasSystemPrompt;
+    }
+
     // construct the query message
     // this is not a real messageId, it is used as placeholder before real messageId returned
     const intermediateId = overrideUserMessageId ?? v4();
@@ -202,6 +217,15 @@ export default function useChatFunctions({
       endpointOption.modelDisplayLabel = modelDisplayLabel;
     } else {
       endpointOption.key = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      // Outerscore: the agents compact schema (`compactAgentsSchema`) strips
+      // `promptPrefix`, so our invisibly-injected canvas document never reaches
+      // the server for a selected agent. Re-attach it here, after parseCompactConvo,
+      // so it survives into the payload (createPayload spreads `...endpointOption`).
+      // The server folds it into the primary agent's instructions (build.js +
+      // client.js). Client-only — no data-provider rebuild required.
+      if (conversation?.promptPrefix) {
+        endpointOption.promptPrefix = conversation.promptPrefix;
+      }
     }
     const responseSender = getSender({ model: conversation?.model, ...endpointOption });
 

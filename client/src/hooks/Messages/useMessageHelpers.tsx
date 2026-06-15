@@ -45,14 +45,6 @@ export default function useMessageHelpers(props: TMessageProps) {
 
     const textKey = getTextKey(message, convoId);
 
-    // Check for text/conversation change
-    const logInfo = {
-      textKey,
-      'latestText.current': latestText.current,
-      messageId: message.messageId,
-      convoId,
-    };
-
     /* Extracted convoId from previous textKey (format: messageId|||length|||lastChars|||convoId) */
     let previousConvoId: string | null = null;
     if (
@@ -68,11 +60,8 @@ export default function useMessageHelpers(props: TMessageProps) {
       textKey !== latestText.current ||
       (convoId != null && previousConvoId != null && convoId !== previousConvoId)
     ) {
-      logger.log('latest_message', '[useMessageHelpers] Setting latest message: ', logInfo);
       latestText.current = textKey;
       setLatestMessage({ ...message });
-    } else {
-      logger.log('latest_message', 'No change in latest message', logInfo);
     }
   }, [isLast, message, setLatestMessage, conversation?.conversationId]);
 

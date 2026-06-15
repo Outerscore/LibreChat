@@ -1,0 +1,78 @@
+# Production docker-compose template for the LibreChat fork.
+#
+# Usage:
+#   export $(grep -v '^#' /path/to/prod-secrets.env | xargs)  # or pull from CI secrets
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Every secret is referenced as ${VAR} — Compose reads them from the host
+# environment (or from a file passed via `--env-file`). Never hard-code a
+# secret in this file; never commit a populated copy.
+#
+# Build-time Vite vars (e.g. VITE_OUTERSCORE_PARENT_ORIGIN) are set at image
+# BUILD time and cannot be overridden here. See scripts/deploy.sh for the
+# canonical build + deploy flow.
+
+services:
+  api:
+    # Override the upstream dev image with a locally-built image that contains
+    # the Outerscore fork. CI produces this tag; the same tag is referenced
+    # across environments (use different tags for staging vs prod).
+    image: ${LIBRECHAT_IMAGE:-librechat:latest}
+    container_name: LibreChat
+    restart: always
+    ports:
+      - "${PORT:-3080}:${PORT:-3080}"
+    depends_on:
+      - mongodb
+      - rag_api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Runtime backend config — safe to change without rebuilding the image.
+      - HOST=0.0.0.0
+      - PORT=${PORT:-3080}
+      - DOMAIN_CLIENT=${DOMAIN_CLIENT}
+      - DOMAIN_SERVER=${DOMAIN_SERVER}
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/LibreChat}
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+      - RAG_PORT=${RAG_PORT:-8000}
+      - RAG_API_URL=http://rag_api:${RAG_PORT:-8000}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - SESSION_EXPIRY=${SESSION_EXPIRY:-1000 * 60 * 15}
+      - REFRESH_TOKEN_EXPIRY=${REFRESH_TOKEN_EXPIRY:-1000 * 60 * 60 * 24 * 7}
+      - CREDS_KEY=${CREDS_KEY}
+      - CREDS_IV=${CREDS_IV}
+      # Outerscore SSO bridge.
+      - OUTERSCORE_SSO_ENABLED=${OUTERSCORE_SSO_ENABLED:-false}
+      - OUTERSCORE_TOKEN_KEY_URL=${OUTERSCORE_TOKEN_KEY_URL}
+      - OUTERSCORE_JWT_ISSUER=${OUTERSCORE_JWT_ISSUER:-}
+      - OUTERSCORE_JWT_AUDIENCE=${OUTERSCORE_JWT_AUDIENCE:-}
+      # Set to true (with both claims above) to reject logins missing iss/aud.
+      - OUTERSCORE_JWT_ENFORCE_CLAIMS=${OUTERSCORE_JWT_ENFORCE_CLAIMS:-false}
+      # Example LLM keys — add the ones you use. Leave blank to disable.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_KEY=${GOOGLE_KEY:-}
+    volumes:
+      - ./images:/app/client/public/images
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+
+  mongodb:
+    # External MongoDB is recommended in prod. Only expose the bundled one
+    # if you're self-hosting a small deployment.
+    restart: always
+
+  meilisearch:
+    restart: always
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+
+  rag_api:
+    restart: always
+    environment:
+      - DB_HOST=vectordb
+      - RAG_PORT=${RAG_PORT:-8000}
+      - RAG_OPENAI_API_KEY=${RAG_OPENAI_API_KEY:-${OPENAI_API_KEY:-}}

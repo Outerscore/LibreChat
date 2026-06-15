@@ -1,0 +1,126 @@
+name: Deploy LibreChat to Test
+
+# Deploys the Outerscore LibreChat fork to the self-hosted test host.
+#
+# Triggers:
+#   • push to `dev`     → auto-redeploy test on every merge (the test line)
+#   • workflow_dispatch → manually build & deploy any branch (pick it in the UI)
+#
+# Builds the image in CI, pushes to GHCR, then SSHes to the host to write the
+# .env (from the GitHub Environment secret), pull the image, and restart Compose.
+# No AWS — the host pulls from GHCR with this run's built-in GITHUB_TOKEN.
+#
+# IMPORTANT: for the `dev` auto-deploy to run unattended, the `test` GitHub
+# Environment must NOT have "required reviewers" (that would pause every merge).
+# Trust the auto path via branch protection on `dev`; optionally restrict secret
+# access with the environment's "deployment branches" policy.
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch or ref to build and deploy"
+        required: true
+        default: "dev"
+
+concurrency:
+  group: librechat-test-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  PARENT_ORIGIN: https://test.outerscore.com
+  # workflow_dispatch → the chosen branch; push → the pushed branch (dev)
+  DEPLOY_REF: ${{ github.event.inputs.branch || github.ref_name }}
+
+jobs:
+  build:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    environment: test
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout ${{ env.DEPLOY_REF }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          SAFE_BRANCH="$(printf '%s' "${DEPLOY_REF}" | tr '/' '-' | tr -cd '[:alnum:]._-')"
+          IMAGE="${REGISTRY}/${OWNER_LC}/librechat-test:${SAFE_BRANCH}-${GITHUB_SHA::8}"
+          LATEST="${REGISTRY}/${OWNER_LC}/librechat-test:test-latest"
+          echo "Building ${IMAGE}"
+          docker build \
+            --build-arg VITE_OUTERSCORE_PARENT_ORIGIN="${PARENT_ORIGIN}" \
+            -t "${IMAGE}" -t "${LATEST}" .
+          docker push "${IMAGE}"
+          docker push "${LATEST}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy to test host
+    needs: build
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - name: Checkout ${{ env.DEPLOY_REF }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Copy compose + config to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.test.yml,librechat.test.yaml"
+          target: "/opt/librechat"
+          overwrite: true
+
+      - name: Write .env, pull image, restart stack
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENV_FILE: ${{ secrets.LIBRECHAT_TEST_ENV }}
+          IMAGE: ${{ needs.build.outputs.image }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: ENV_FILE,IMAGE,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -euo pipefail
+            cd /opt/librechat
+            umask 077
+            # Materialize the env file from the GitHub Environment secret, then pin
+            # the exact image that was just built and pushed.
+            printf '%s\n' "$ENV_FILE" > .env
+            sed -i '/^LIBRECHAT_IMAGE=/d' .env
+            echo "LIBRECHAT_IMAGE=$IMAGE" >> .env
+            chmod 600 .env
+            # Pull from GHCR using this run's token, then drop the credential.
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker pull "$IMAGE"
+            docker compose -f docker-compose.test.yml up -d
+            docker logout ghcr.io || true
+            docker image prune -f

@@ -28,6 +28,7 @@ import {
 } from '~/data-provider';
 import { TAuthConfig, TUserContext, TAuthContext, TResError } from '~/common';
 import { SESSION_KEY, isSafeRedirect, getPostLoginRedirect } from '~/utils';
+import useOuterscoreAutoLogin from './useOuterscoreAutoLogin';
 import useTimeout from './useTimeout';
 import store from '~/store';
 
@@ -165,6 +166,39 @@ const AuthContextProvider = ({
     [logoutUser],
   );
 
+  const { enabled: outerscoreEnabled } = useOuterscoreAutoLogin({
+    isAuthenticated,
+    currentUserId: user?.id,
+    onSuccess: (data) => {
+      setError(undefined);
+      /** Preserve the current location instead of hard-redirecting to /c/new:
+       * the Outerscore host deep-links /c/<id> to restore a docked conversation
+       * when the panel reopens, and the bridge login runs on every iframe boot —
+       * a fixed '/c/new' here clobbered the restored route (and the bounce made
+       * the conversation bridge post null, wiping the host's memory of it). */
+      const baseUrl = apiBaseUrl();
+      const rawPath = window.location.pathname;
+      const strippedPath =
+        baseUrl && (rawPath === baseUrl || rawPath.startsWith(baseUrl + '/'))
+          ? rawPath.slice(baseUrl.length) || '/'
+          : rawPath;
+      const currentUrl = `${strippedPath}${window.location.search}`;
+      const preserveCurrent =
+        isSafeRedirect(currentUrl) &&
+        !currentUrl.startsWith('/login') &&
+        !currentUrl.startsWith('/register');
+      setUserContext({
+        token: data.token,
+        isAuthenticated: true,
+        user: data.user,
+        redirect: preserveCurrent ? currentUrl : '/c/new',
+      });
+    },
+    onUserSwitch: () => {
+      logoutUser.mutate(undefined);
+    },
+  });
+
   const userQuery = useGetUserQuery({ enabled: !!(token ?? '') });
 
   const login = (data: t.TLoginUser) => {
@@ -235,6 +269,9 @@ const AuthContextProvider = ({
       doSetError(undefined);
     }
     if (token == null || !token || !isAuthenticated) {
+      if (outerscoreEnabled) {
+        return;
+      }
       silentRefresh();
     }
   }, [
@@ -248,6 +285,7 @@ const AuthContextProvider = ({
     navigate,
     silentRefresh,
     setUserContext,
+    outerscoreEnabled,
   ]);
 
   useEffect(() => {
@@ -266,6 +304,17 @@ const AuthContextProvider = ({
       window.removeEventListener('tokenUpdated', handleTokenUpdate as EventListener);
     };
   }, [setUserContext, user]);
+
+  useEffect(() => {
+    if (!outerscoreEnabled) return;
+    const handleOuterscoreLogout = () => {
+      logoutUser.mutate(undefined);
+    };
+    window.addEventListener('outerscore:logout', handleOuterscoreLogout);
+    return () => {
+      window.removeEventListener('outerscore:logout', handleOuterscoreLogout);
+    };
+  }, [outerscoreEnabled, logoutUser]);
 
   const memoedValue = useMemo(
     () => ({

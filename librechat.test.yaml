@@ -1,0 +1,33 @@
+# Outerscore TEST LibreChat config (tracked — the local `librechat.yaml` is gitignored).
+# Shipped to the host by .github/workflows/deploy-test.yml and bind-mounted into the
+# container at /app/librechat.yaml (see docker-compose.test.yml).
+version: 1.3.8
+cache: true
+
+interface:
+  privacyPolicy:
+    externalUrl: ''
+  termsOfService:
+    modalAcceptance: false
+  modelSelect: true
+  # Agents are enabled for ALL users (decision 2026-06-12): Outerscore is the only
+  # identity source, so there is no separate LibreChat admin account. The official
+  # compliance agents are protected by their per-agent ACL — only their author
+  # (an Outerscore-bridged user) and explicitly-granted editors can modify them;
+  # other users can merely create their own personal agents. NEVER grant the
+  # LibreChat ADMIN role broadly — it includes user/role management.
+  agents:
+    use: true
+    create: true
+
+# Claude only. The Anthropic endpoint is enabled by ANTHROPIC_API_KEY (set in .env);
+# this block restricts the selectable models and uses a cheap model for titles.
+endpoints:
+  anthropic:
+    titleConvo: true
+    titleModel: "claude-haiku-4-5-20251001"
+    streamRate: 25
+    models:
+      - "claude-opus-4-8"
+      - "claude-sonnet-4-6"
+      - "claude-haiku-4-5-20251001"

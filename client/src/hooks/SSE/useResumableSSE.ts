@@ -24,6 +24,7 @@ import {
 } from '~/data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { createCanvasStreamBridge } from './canvasStream';
 import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
 import store from '~/store';
@@ -142,6 +143,14 @@ export default function useResumableSSE(
     (currentStreamId: string, currentSubmission: TSubmission, isResume = false) => {
       let { userMessage } = currentSubmission;
       let textIndex: number | null = null;
+      // Canvas streaming bridge — intent-aware, shared with useSSE so this active
+      // (resumable) path drives the editor canvas with the same logic.
+      const canvasBridge = createCanvasStreamBridge({
+        getMessages,
+        setMessages,
+        queryClient,
+        getConversationId: () => currentSubmission.conversation?.conversationId,
+      });
 
       const baseUrl = `${apiBaseUrl()}/api/agents/chat/stream/${encodeURIComponent(currentStreamId)}`;
       const url = isResume ? `${baseUrl}?resume=true` : baseUrl;
@@ -185,6 +194,7 @@ export default function useResumableSSE(
             // Optimistically remove from active jobs
             removeActiveJob(currentStreamId);
             (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
+            canvasBridge.finalize();
             sse.close();
             setStreamId(null);
             return;
@@ -216,6 +226,9 @@ export default function useResumableSSE(
 
           if (data.event != null) {
             stepHandler(data, { ...currentSubmission, userMessage } as EventSubmission);
+            // Agents endpoint streams text deltas through stepHandler — forward each one
+            // to the canvas so it animates live (no-op until the assistant text grows).
+            canvasBridge.forwardCanvasStream();
             return;
           }
 
@@ -318,6 +331,7 @@ export default function useResumableSSE(
               textIndex = index;
             }
             contentHandler({ data, submission: currentSubmission as EventSubmission });
+            canvasBridge.forwardCanvasStream();
             return;
           }
 
@@ -329,6 +343,7 @@ export default function useResumableSSE(
               messageId: data.messageId,
             };
             messageHandler(text, { ...currentSubmission, userMessage, initialResponse });
+            canvasBridge.forwardCanvasStream();
           }
         } catch (error) {
           console.error('[ResumableSSE] Error processing message:', error);

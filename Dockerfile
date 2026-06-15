@@ -17,6 +17,12 @@ RUN uv --version
 # Set configurable max-old-space-size with default
 ARG NODE_MAX_OLD_SPACE_SIZE=6144
 
+# Build-time Vite env vars — these are inlined into the client bundle during
+# `npm run frontend` and cannot be overridden at runtime. Pass via
+# `docker build --build-arg VITE_OUTERSCORE_PARENT_ORIGIN=https://your-parent`.
+ARG VITE_OUTERSCORE_PARENT_ORIGIN=""
+ENV VITE_OUTERSCORE_PARENT_ORIGIN=${VITE_OUTERSCORE_PARENT_ORIGIN}
+
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
 

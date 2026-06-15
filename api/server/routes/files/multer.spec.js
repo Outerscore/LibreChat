@@ -447,14 +447,23 @@ describe('Multer Configuration', () => {
     });
 
     it('should handle file system errors when directory creation fails', () => {
-      // Test with a non-existent parent directory to simulate fs issues
-      const invalidPath = '/nonexistent/path/that/should/not/exist';
-      mockReq.config.paths.uploads = invalidPath;
+      // Force mkdir to fail deterministically across platforms — an "invalid"
+      // absolute path is still creatable on Windows (rooted to the drive), so a
+      // path alone won't reproduce the failure. The implementation doesn't catch
+      // the error, so it propagates synchronously.
+      const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(false);
+      const mkdirSpy = jest.spyOn(fs, 'mkdirSync').mockImplementation(() => {
+        throw new Error('EACCES: permission denied');
+      });
 
-      // The current implementation doesn't catch errors, so they're thrown synchronously
-      expect(() => {
-        storage.getDestination(mockReq, mockFile, jest.fn());
-      }).toThrow();
+      try {
+        expect(() => {
+          storage.getDestination(mockReq, mockFile, jest.fn());
+        }).toThrow();
+      } finally {
+        existsSpy.mockRestore();
+        mkdirSpy.mockRestore();
+      }
     });
 
     it('should handle malformed filenames with real sanitization', (done) => {

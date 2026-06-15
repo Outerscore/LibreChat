@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSetRecoilState } from 'recoil';
 import { request, createPayload, removeNullishValues } from 'librechat-data-provider';
 import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
@@ -8,13 +9,10 @@ import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { createCanvasStreamBridge } from './canvasStream';
 import useEventHandlers from './useEventHandlers';
 import { clearAllDrafts } from '~/utils';
 import store from '~/store';
-
-type CanvasStreamMessage =
-  | { type: 'outerscore:stream-chunk'; chunk: string; accumulated: string }
-  | { type: 'outerscore:stream-end'; accumulated: string };
 
 type ChatHelpers = Pick<
   EventHandlerParams,
@@ -38,6 +36,7 @@ export default function useSSE(
   const [completed, setCompleted] = useState(new Set());
   const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
   const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(runIndex));
+  const queryClient = useQueryClient();
 
   const {
     setMessages,
@@ -88,14 +87,12 @@ export default function useSSE(
     payload = removeNullishValues(payload) as TPayload;
 
     let textIndex = null;
-    let accumulatedText = '';
-    const isInIframe = typeof window !== 'undefined' && window.parent !== window;
-    const postToCanvas = (message: CanvasStreamMessage) => {
-      if (!isInIframe) {
-        return;
-      }
-      window.parent.postMessage(message, '*');
-    };
+    const canvasBridge = createCanvasStreamBridge({
+      getMessages,
+      setMessages,
+      queryClient,
+      getConversationId: () => submission.conversation?.conversationId,
+    });
     clearStepMaps();
 
     const sse = new SSE(payloadData.server, {
@@ -125,8 +122,7 @@ export default function useSSE(
           setShowStopButton(false);
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
-        postToCanvas({ type: 'outerscore:stream-end', accumulated: accumulatedText });
-        console.log('final', data);
+        canvasBridge.finalize();
         return;
       } else if (data.created != null) {
         const runId = v4();
@@ -150,21 +146,9 @@ export default function useSSE(
         if (text != null && index !== textIndex) {
           textIndex = index;
         }
-
         contentHandler({ data, submission: submission as EventSubmission });
       } else {
         const text: string = data.text ?? data.response ?? '';
-
-        if (isInIframe && typeof text === 'string' && text.length > accumulatedText.length) {
-          const chunk = text.slice(accumulatedText.length);
-          accumulatedText = text;
-          postToCanvas({
-            type: 'outerscore:stream-chunk',
-            chunk,
-            accumulated: accumulatedText,
-          });
-        }
-
         const initialResponse = {
           ...(submission.initialResponse as TMessage),
           parentMessageId: data.parentMessageId,
@@ -175,11 +159,12 @@ export default function useSSE(
           messageHandler(text, { ...submission, userMessage, initialResponse });
         }
       }
+
+      canvasBridge.forwardCanvasStream();
     });
 
     sse.addEventListener('open', () => {
       setAbortScroll(false);
-      console.log('connection is opened');
     });
 
     sse.addEventListener('cancel', async () => {
@@ -232,19 +217,17 @@ export default function useSSE(
           return;
         } catch (error) {
           /* token refresh failed, continue handling the original 401 */
-          console.log(error);
+          console.error('[useSSE] token refresh failed:', error);
         }
       }
 
-      console.log('error in server stream.');
       (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
 
       let data: TResData | undefined = undefined;
       try {
         data = JSON.parse(e.data) as TResData;
       } catch (error) {
-        console.error(error);
-        console.log(e);
+        console.error('[useSSE] failed to parse server error event:', error);
         setIsSubmitting(false);
       }
 

@@ -4,15 +4,21 @@ import { DndProvider } from 'react-dnd';
 import { RouterProvider } from 'react-router-dom';
 import * as RadixToast from '@radix-ui/react-toast';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Toast, ThemeProvider, ToastProvider } from '@librechat/client';
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
 import { ScreenshotProvider, useApiErrorBoundary } from './hooks';
+import useOuterscoreLanguageBridge from '~/hooks/useOuterscoreLanguageBridge';
 import WakeLockManager from '~/components/System/WakeLockManager';
 import { getThemeFromEnv } from './utils/getThemeFromEnv';
 import { initializeFontSize } from '~/store/fontSize';
 import { LiveAnnouncer } from '~/a11y';
 import { router } from './routes';
+
+/** Host-driven bridges while embedded: language sync. */
+const OuterscoreBridges = () => {
+  useOuterscoreLanguageBridge();
+  return null;
+};
 
 const App = () => {
   const { setError } = useApiErrorBoundary();
@@ -62,8 +68,8 @@ const App = () => {
               <ToastProvider>
                 <DndProvider backend={HTML5Backend}>
                   <RouterProvider router={router} />
+                  <OuterscoreBridges />
                   <WakeLockManager />
-                  <ReactQueryDevtools initialIsOpen={false} position="top-right" />
                   <Toast />
                   <RadixToast.Viewport className="pointer-events-none fixed inset-0 z-[1000] mx-auto my-2 flex max-w-[560px] flex-col items-stretch justify-start md:pb-5" />
                 </DndProvider>

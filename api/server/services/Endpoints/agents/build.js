@@ -8,6 +8,11 @@ const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMC
 
 const buildOptions = (req, endpoint, parsedBody, endpointType) => {
   const { spec, iconURL, agent_id, ...model_parameters } = parsedBody;
+  // Read the invisibly-injected canvas document from the RAW body — `parsedBody`
+  // has already been run through `parseCompactConvo` (compactAgentsSchema), which
+  // strips `promptPrefix` for agents. The AgentClient folds it into the primary
+  // agent's instructions (see controllers/agents/client.js).
+  const promptPrefix = req.body?.promptPrefix;
   const agentPromise = loadAgent({
     req,
     spec,
@@ -29,6 +34,7 @@ const buildOptions = (req, endpoint, parsedBody, endpointType) => {
     agent_id,
     endpointType,
     model_parameters,
+    promptPrefix,
     agent: agentPromise,
     addedConvo,
   });

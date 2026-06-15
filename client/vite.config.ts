@@ -30,9 +30,16 @@ const NODE_POLYFILL_SHIMS: Record<string, string> = {
 
 // https://vitejs.dev/config/
 const backendPort = (process.env.BACKEND_PORT && Number(process.env.BACKEND_PORT)) || 3080;
-const backendURL = process.env.HOST
-  ? `http://${process.env.HOST}:${backendPort}`
-  : `http://localhost:${backendPort}`;
+// The dev proxy must CONNECT to a concrete loopback address. `0.0.0.0` / `::` are
+// bind-all addresses — valid for HOST (where the backend listens) but not reliably
+// routable as a connect target on Windows — and bare `localhost` can resolve to
+// IPv6 `::1` while the backend listens on IPv4 only. Either makes every proxied
+// /api call fail with a 500, so normalize a bind-all/empty HOST to 127.0.0.1.
+const backendHost =
+  process.env.HOST && !['0.0.0.0', '::', ''].includes(process.env.HOST)
+    ? process.env.HOST
+    : '127.0.0.1';
+const backendURL = `http://${backendHost}:${backendPort}`;
 
 export default defineConfig(({ command }) => ({
   base: '',
