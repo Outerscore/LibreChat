@@ -323,6 +323,15 @@ export const isComplianceOnlyReply = (text: string): boolean => {
   return COMPLIANCE_ENVELOPE.test(text);
 };
 
+/**
+ * True when a reply is (or is becoming) a compliance-only envelope: the opening
+ * `<compliance` tag is present and there is no `<document>`. Unlike
+ * {@link isComplianceOnlyReply} this does NOT require the closing tag, so the
+ * display layer can suppress the raw JSON while it is still streaming.
+ */
+export const isComplianceReplyText = (text: string): boolean =>
+  !!text && !text.includes(DOC_OPEN) && text.includes(COMPLIANCE_OPEN);
+
 /** Short bubble shown in the chat after an audit (findings live in the host panel). */
 export const COMPLIANCE_SUMMARY_TEXT = 'Compliance review complete — see the results panel.';
 

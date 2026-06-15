@@ -21,8 +21,7 @@ export default function useOuterscoreConversationBridge(conversationId: string) 
       return;
     }
 
-    const id =
-      conversationId && conversationId !== Constants.NEW_CONVO ? conversationId : null;
+    const id = conversationId && conversationId !== Constants.NEW_CONVO ? conversationId : null;
 
     if (lastPostedRef.current === id) {
       return;

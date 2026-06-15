@@ -16,7 +16,12 @@ import {
   postCanvasContent,
   extractPartsText,
 } from './CanvasStatus';
-import { shouldMaskCanvasReply } from '~/utils/canvas';
+import {
+  formatComplianceReply,
+  isComplianceOnlyReply,
+  isComplianceReplyText,
+  shouldMaskCanvasReply,
+} from '~/utils/canvas';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';
 import ToolCallGroup from './ToolCallGroup';
@@ -205,6 +210,43 @@ const ContentParts = memo(function ContentParts({
       <>
         {thinkParts.map(({ part, idx }) => renderPart(part, idx, false))}
         {effectiveIsSubmitting ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />}
+      </>
+    );
+  }
+
+  // Compliance reply outside a canvas page (e.g. the compliance agent in a regular
+  // chat): render the findings as readable markdown instead of the raw <compliance>
+  // JSON. While it is still streaming, show the generating indicator rather than a
+  // half-written envelope. Think parts stay visible; edit mode is exempt.
+  if (
+    !isCreatedByUser &&
+    edit !== true &&
+    !isCanvas2Mode() &&
+    isComplianceReplyText(extractPartsText(content))
+  ) {
+    const partsText = extractPartsText(content);
+    const isComplete = isComplianceOnlyReply(partsText);
+    const thinkParts: PartWithIndex[] = [];
+    content?.forEach((part, idx) => {
+      if (part?.type === ContentTypes.THINK) {
+        thinkParts.push({ part, idx });
+      }
+    });
+    return (
+      <>
+        {thinkParts.map(({ part, idx }) => renderPart(part, idx, false))}
+        {isComplete ? (
+          renderPart(
+            {
+              type: ContentTypes.TEXT,
+              text: formatComplianceReply(partsText),
+            } as TMessageContentParts,
+            content?.length ?? 0,
+            true,
+          )
+        ) : (
+          <CanvasWritingIndicator />
+        )}
       </>
     );
   }

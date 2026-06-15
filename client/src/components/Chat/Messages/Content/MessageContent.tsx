@@ -6,7 +6,12 @@ import type { TMessageContentProps, TDisplayProps } from '~/common';
 import Error from '~/components/Messages/Content/Error';
 import { useMessageContext } from '~/Providers';
 import { CanvasWritingIndicator, CanvasDoneIndicator, isCanvas2Mode } from './CanvasStatus';
-import { shouldMaskCanvasReply } from '~/utils/canvas';
+import {
+  formatComplianceReply,
+  isComplianceOnlyReply,
+  isComplianceReplyText,
+  shouldMaskCanvasReply,
+} from '~/utils/canvas';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
@@ -188,6 +193,30 @@ const MessageContent = ({
           <Thinking key={`thinking-${messageId}`}>{thinkingContent}</Thinking>
         )}
         {inFlight ? <CanvasWritingIndicator /> : <CanvasDoneIndicator />}
+      </>
+    );
+  }
+
+  // Compliance reply outside a canvas page (e.g. the compliance agent in a regular
+  // chat): render the findings as readable markdown instead of the raw <compliance>
+  // JSON. While it streams, show the generating indicator rather than a half-written
+  // envelope. Thinking content stays visible.
+  if (!message.isCreatedByUser && !isCanvas2Mode() && isComplianceReplyText(regularContent)) {
+    return (
+      <>
+        {thinkingContent.length > 0 && (
+          <Thinking key={`thinking-${messageId}`}>{thinkingContent}</Thinking>
+        )}
+        {isComplianceOnlyReply(regularContent) ? (
+          <DisplayMessage
+            key={`display-${messageId}`}
+            showCursor={false}
+            text={formatComplianceReply(regularContent)}
+            {...props}
+          />
+        ) : (
+          <CanvasWritingIndicator />
+        )}
       </>
     );
   }

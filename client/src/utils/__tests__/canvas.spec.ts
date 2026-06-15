@@ -6,6 +6,7 @@ import {
   extractMessageText,
   formatComplianceReply,
   isComplianceOnlyReply,
+  isComplianceReplyText,
   getCanvasMode,
   isDocumentReplyText,
   isMessageCanvasDoc,
@@ -269,6 +270,21 @@ describe('canvas — isComplianceOnlyReply', () => {
   it('is false for a plain chat reply or empty text', () => {
     expect(isComplianceOnlyReply('A fair day rate depends on…')).toBe(false);
     expect(isComplianceOnlyReply('')).toBe(false);
+  });
+});
+
+describe('canvas — isComplianceReplyText (streaming-tolerant)', () => {
+  it('is true for a complete or partial compliance envelope (no document)', () => {
+    expect(isComplianceReplyText('<compliance>{"findings":[]}</compliance>')).toBe(true);
+    expect(isComplianceReplyText('<compliance>{"findi')).toBe(true);
+  });
+
+  it('is false for a document reply or plain chat', () => {
+    expect(isComplianceReplyText('<document>Body</document><compliance>{}</compliance>')).toBe(
+      false,
+    );
+    expect(isComplianceReplyText('A fair day rate depends on…')).toBe(false);
+    expect(isComplianceReplyText('')).toBe(false);
   });
 });
 
