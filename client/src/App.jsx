@@ -9,6 +9,8 @@ import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-qu
 import { ScreenshotProvider, useApiErrorBoundary } from './hooks';
 import useOuterscoreLanguageBridge from '~/hooks/useOuterscoreLanguageBridge';
 import WakeLockManager from '~/components/System/WakeLockManager';
+import QueryDevtoolsGate from '~/components/QueryDevtoolsGate';
+import LanguageSync from '~/components/System/LanguageSync';
 import { getThemeFromEnv } from './utils/getThemeFromEnv';
 import { initializeFontSize } from '~/store/fontSize';
 import { LiveAnnouncer } from '~/a11y';
@@ -53,6 +55,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <RecoilRoot>
+        <LanguageSync />
         <LiveAnnouncer>
           <ThemeProvider
             // Only pass initialTheme and themeRGB if environment theme exists
@@ -70,6 +73,7 @@ const App = () => {
                   <RouterProvider router={router} />
                   <OuterscoreBridges />
                   <WakeLockManager />
+                  <QueryDevtoolsGate />
                   <Toast />
                   <RadixToast.Viewport className="pointer-events-none fixed inset-0 z-[1000] mx-auto my-2 flex max-w-[560px] flex-col items-stretch justify-start md:pb-5" />
                 </DndProvider>

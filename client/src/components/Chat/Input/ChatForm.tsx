@@ -6,12 +6,6 @@ import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-dat
 import type { TConversation } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter, ConvoGenerator } from '~/common';
 import {
-  useChatContext,
-  useChatFormContext,
-  useAddedChatContext,
-  useAssistantsMapContext,
-} from '~/Providers';
-import {
   useTextarea,
   useAutoSave,
   useLocalize,
@@ -21,16 +15,26 @@ import {
   useSubmitMessage,
   useFocusChatEffect,
 } from '~/hooks';
+import {
+  useChatContext,
+  useChatFormContext,
+  useAddedChatContext,
+  useAssistantsMapContext,
+} from '~/Providers';
+import PendingManualSkillsChips from './PendingManualSkillsChips';
+import { cn, getModelSpec, removeFocusRings } from '~/utils';
+import { useGetStartupConfig } from '~/data-provider';
 import { mainTextareaId, BadgeItem } from '~/common';
 import AttachFileChat from './Files/AttachFileChat';
 import FileFormChat from './Files/FileFormChat';
-import { cn, removeFocusRings } from '~/utils';
 import CanvasModeToggle from './CanvasModeToggle';
 import TextareaHeader from './TextareaHeader';
 import PromptsCommand from './PromptsCommand';
+import SkillsCommand from './SkillsCommand';
 import AudioRecorder from './AudioRecorder';
 import CollapseChat from './CollapseChat';
 import StreamAudio from './StreamAudio';
+import TokenUsage from './TokenUsage';
 import StopButton from './StopButton';
 import SendButton from './SendButton';
 import EditBadges from './EditBadges';
@@ -40,6 +44,7 @@ import store from '~/store';
 
 interface ChatFormProps {
   index: number;
+  placeholder?: string;
   /** From ChatContext — individual values so memo can compare them */
   files: Map<string, ExtendedFile>;
   setFiles: FileSetter;
@@ -53,6 +58,7 @@ interface ChatFormProps {
 
 const ChatForm = memo(function ChatForm({
   index,
+  placeholder,
   files,
   setFiles,
   conversation,
@@ -95,11 +101,17 @@ const ChatForm = memo(function ChatForm({
     setConversation: setAddedConvo,
   } = useAddedChatContext();
   const assistantMap = useAssistantsMapContext();
+  const { data: startupConfig } = useGetStartupConfig();
 
   const endpoint = useMemo(
     () => conversation?.endpointType ?? conversation?.endpoint,
     [conversation?.endpointType, conversation?.endpoint],
   );
+  const modelSpec = useMemo(
+    () => getModelSpec({ specName: conversation?.spec, startupConfig }),
+    [conversation?.spec, startupConfig],
+  );
+  const hideBadgeRow = modelSpec?.hideBadgeRow === true;
   const conversationId = useMemo(
     () => conversation?.conversationId ?? Constants.NEW_CONVO,
     [conversation?.conversationId],
@@ -169,6 +181,7 @@ const ChatForm = memo(function ChatForm({
     submitButtonRef,
     setIsScrollable,
     disabled: disableInputs,
+    placeholder,
   });
 
   useQueryParams({ textAreaRef });
@@ -255,6 +268,12 @@ const ChatForm = memo(function ChatForm({
             textAreaRef={textAreaRef}
           />
           <PromptsCommand index={index} textAreaRef={textAreaRef} submitPrompt={submitPrompt} />
+          <SkillsCommand
+            index={index}
+            textAreaRef={textAreaRef}
+            conversationId={conversationId}
+            agentId={conversation?.agent_id}
+          />
           <div
             onClick={handleContainerClick}
             className={cn(
@@ -266,6 +285,7 @@ const ChatForm = memo(function ChatForm({
             )}
           >
             <TextareaHeader addedConvo={addedConvo} setAddedConvo={setAddedConvo} />
+            <PendingManualSkillsChips conversationId={conversationId} />
             {/* WIP */}
             <EditBadges
               isEditingChatBadges={isEditingBadges}
@@ -347,7 +367,10 @@ const ChatForm = memo(function ChatForm({
               </div>
               <BadgeRow
                 showEphemeralBadges={
-                  !!endpoint && !isAgentsEndpoint(endpoint) && !isAssistantsEndpoint(endpoint)
+                  !!endpoint &&
+                  !hideBadgeRow &&
+                  !isAgentsEndpoint(endpoint) &&
+                  !isAssistantsEndpoint(endpoint)
                 }
                 isSubmitting={isSubmitting}
                 conversationId={conversationId}
@@ -359,6 +382,7 @@ const ChatForm = memo(function ChatForm({
               />
               <CanvasModeToggle />
               <div className="mx-auto flex" />
+              <TokenUsage index={index} conversation={conversation} isSubmitting={isSubmitting} />
               {SpeechToText && (
                 <AudioRecorder
                   methods={methods}
@@ -396,7 +420,7 @@ ChatForm.displayName = 'ChatForm';
  * to the memo'd ChatForm. This prevents ChatForm from re-rendering on every
  * streaming chunk — it only re-renders when the specific values it uses change.
  */
-function ChatFormWrapper({ index = 0 }: { index?: number }) {
+function ChatFormWrapper({ index = 0, placeholder }: { index?: number; placeholder?: string }) {
   const {
     files,
     setFiles,
@@ -425,6 +449,7 @@ function ChatFormWrapper({ index = 0 }: { index?: number }) {
       conversation?.spec,
       conversation?.useResponsesApi,
       conversation?.model,
+      conversation?.maxContextTokens,
       hasMessages,
     ],
   );
@@ -448,6 +473,7 @@ function ChatFormWrapper({ index = 0 }: { index?: number }) {
   return (
     <ChatForm
       index={index}
+      placeholder={placeholder}
       files={files}
       setFiles={setFiles}
       conversation={stableConversation}

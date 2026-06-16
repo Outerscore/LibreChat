@@ -1,11 +1,15 @@
 import { useMemo, useCallback } from 'react';
 import { EModelEndpoint, Constants } from 'librechat-data-provider';
+import {
+  useGetAssistantDocsQuery,
+  useGetEndpointsQuery,
+  useGetStartupConfig,
+} from '~/data-provider';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
-import { useGetAssistantDocsQuery, useGetEndpointsQuery } from '~/data-provider';
 import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
-import { useSubmitMessage, useLocalize } from '~/hooks';
+import { getIconEndpoint, getEntity, getModelSpec } from '~/utils';
 import { OS_EMBEDDED_STARTERS } from '~/utils/starters';
-import { getIconEndpoint, getEntity } from '~/utils';
+import { useSubmitMessage, useLocalize } from '~/hooks';
 
 interface StarterChip {
   label: string;
@@ -17,6 +21,7 @@ const ConversationStarters = () => {
   const agentsMap = useAgentsMapContext();
   const assistantMap = useAssistantsMapContext();
   const { data: endpointsConfig } = useGetEndpointsQuery();
+  const { data: startupConfig } = useGetStartupConfig();
   const localize = useLocalize();
 
   const endpointType = useMemo(() => {
@@ -43,9 +48,18 @@ const ConversationStarters = () => {
     assistant_id: conversation?.assistant_id,
   });
 
+  const modelSpec = useMemo(
+    () => getModelSpec({ specName: conversation?.spec, startupConfig }),
+    [conversation?.spec, startupConfig],
+  );
+
   const conversation_starters = useMemo(() => {
     if (entity?.conversation_starters?.length) {
       return entity.conversation_starters;
+    }
+
+    if (modelSpec?.conversation_starters?.length) {
+      return modelSpec.conversation_starters;
     }
 
     if (isAgent) {
@@ -53,7 +67,7 @@ const ConversationStarters = () => {
     }
 
     return documentsMap.get(entity?.id ?? '')?.conversation_starters ?? [];
-  }, [documentsMap, isAgent, entity]);
+  }, [documentsMap, isAgent, entity, modelSpec]);
 
   const isEmbeddedFallback = conversation_starters.length === 0 && isOuterscoreContext();
 
@@ -80,26 +94,33 @@ const ConversationStarters = () => {
   }
 
   return (
-    <div className="mb-8 flex flex-wrap justify-center gap-3 px-4">
+    <div
+      className={
+        isEmbeddedFallback
+          ? 'mb-8 flex flex-wrap justify-center gap-3 px-4'
+          : 'mb-8 mt-2 flex w-full flex-wrap items-stretch justify-center gap-2 px-4'
+      }
+    >
       {starters.map(({ label, prompt }, index) => (
         <button
           key={index}
           onClick={() => sendConversationStarter(prompt)}
+          style={
+            isEmbeddedFallback
+              ? undefined
+              : { animationDelay: `${index * 75}ms`, animationFillMode: 'backwards' }
+          }
           className={
             isEmbeddedFallback
               ? 'os-starter-chip flex cursor-pointer items-center fade-in'
-              : 'relative flex w-40 cursor-pointer flex-col gap-2 rounded-2xl border border-border-medium px-3 pb-4 pt-3 text-start align-top text-[15px] shadow-[0_0_2px_0_rgba(0,0,0,0.05),0_4px_6px_0_rgba(0,0,0,0.02)] transition-colors duration-300 ease-in-out fade-in hover:bg-surface-tertiary'
+              : 'flex max-w-[16rem] cursor-pointer items-center justify-center rounded-2xl border border-border-medium bg-surface-secondary px-4 py-2.5 text-center text-sm text-text-secondary shadow-sm transition-colors duration-200 fade-in hover:border-border-heavy hover:bg-surface-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring-primary'
           }
         >
-          <p
-            className={
-              isEmbeddedFallback
-                ? 'whitespace-nowrap'
-                : 'break-word line-clamp-3 overflow-hidden text-balance break-all text-text-secondary'
-            }
-          >
-            {label}
-          </p>
+          {isEmbeddedFallback ? (
+            <p className="whitespace-nowrap">{label}</p>
+          ) : (
+            <span className="line-clamp-2 text-balance break-words">{label}</span>
+          )}
         </button>
       ))}
     </div>
