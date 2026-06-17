@@ -7,7 +7,7 @@ const db = require('~/models');
 const loadAgent = (params) => loadAgentFn(params, { getAgent: db.getAgent, getMCPServerTools });
 
 const buildOptions = (req, endpoint, parsedBody, endpointType) => {
-  const { spec, iconURL, agent_id, ...model_parameters } = parsedBody;
+  const { spec, iconURL, agent_id, chatProjectId, ...model_parameters } = parsedBody;
   // Read the invisibly-injected canvas document from the RAW body — `parsedBody`
   // has already been run through `parseCompactConvo` (compactAgentsSchema), which
   // strips `promptPrefix` for agents. The AgentClient folds it into the primary
@@ -33,6 +33,7 @@ const buildOptions = (req, endpoint, parsedBody, endpointType) => {
     endpoint,
     agent_id,
     endpointType,
+    chatProjectId,
     model_parameters,
     promptPrefix,
     agent: agentPromise,

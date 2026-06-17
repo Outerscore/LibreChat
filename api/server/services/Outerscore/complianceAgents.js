@@ -71,17 +71,18 @@ const seedOne = async (spec) => {
     });
     logger.info(`[outerscore] seeded compliance agent ${spec.id} (model ${model})`);
   }
-  // PUBLIC *viewer* so every embedded user can select/use the agent, but NOT edit
-  // the shared company compliance rules. Editing is reserved for the designated
-  // owner (OUTERSCORE_COMPLIANCE_OWNER_EMAIL) below — and, longer term, gated by an
-  // Outerscore right (WP-I `AI_AGENT_MANAGE`). This matches the access model
-  // documented in librechat.test.yaml.
+  // PUBLIC *editor* so every authenticated user can both select/use AND edit the
+  // seeded compliance agents in the builder — the interim "anyone can edit" model.
+  // The grant is idempotent and re-applied on every startup, so this also upgrades
+  // the already-seeded agents on the next boot (no delete/re-seed needed). Longer
+  // term this should be gated by an Outerscore right (WP-I `AI_AGENT_MANAGE`) before
+  // the shared company compliance rules are locked back down to owner-only.
   await grantPermission({
     principalType: PrincipalType.PUBLIC,
     principalId: null,
     resourceType: ResourceType.AGENT,
     resourceId: agent._id,
-    accessRoleId: AccessRoleIds.AGENT_VIEWER,
+    accessRoleId: AccessRoleIds.AGENT_EDITOR,
     grantedBy: SYSTEM_AUTHOR_ID,
   });
   // Grant the designated owner EDIT so they can tune the rules in the builder.

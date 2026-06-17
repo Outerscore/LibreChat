@@ -1,14 +1,14 @@
 import { logger } from '@librechat/data-schemas';
 import type { Redis, Cluster } from 'ioredis';
-import { RedisEventTransport } from '~/stream/implementations/RedisEventTransport';
-import { GenerationJobManagerClass } from '~/stream/GenerationJobManager';
-import { createStreamServices } from '~/stream/createStreamServices';
-import { createMockPublisher } from './helpers/publisher';
 import {
   ioredisClient as staticRedisClient,
   keyvRedisClient as staticKeyvClient,
   keyvRedisClientReady,
 } from '~/cache/redisClients';
+import { RedisEventTransport } from '~/stream/implementations/RedisEventTransport';
+import { GenerationJobManagerClass } from '~/stream/GenerationJobManager';
+import { createStreamServices } from '~/stream/createStreamServices';
+import { createMockPublisher } from './helpers/publisher';
 
 logger.silent = true;
 
@@ -232,6 +232,60 @@ describe('Reconnect Reorder Buffer Desync (Regression)', () => {
       expect(chunks.map((c) => (c as { index: number }).index)).toEqual([20, 21, 22, 23, 24]);
 
       sub.unsubscribe();
+      transport.destroy();
+    });
+
+    test('should not carry nextSeq into a new generation after last unsubscribe', async () => {
+      const mockPublisher = createMockPublisher();
+      const mockSubscriber = {
+        on: jest.fn(),
+        subscribe: jest.fn().mockResolvedValue(undefined),
+        unsubscribe: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const transport = new RedisEventTransport(
+        mockPublisher as unknown as Redis,
+        mockSubscriber as unknown as Redis,
+      );
+
+      const streamId = 'reorder-generation-reuse-test';
+      const firstRunChunks: unknown[] = [];
+
+      const firstSub = transport.subscribe(streamId, {
+        onChunk: (event) => firstRunChunks.push(event),
+      });
+
+      await transport.syncReorderBuffer(streamId);
+
+      const messageHandler = mockSubscriber.on.mock.calls.find(
+        (call) => call[0] === 'message',
+      )?.[1] as (channel: string, message: string) => void;
+      const channel = `stream:{${streamId}}:events`;
+
+      for (let i = 0; i < 5; i++) {
+        await transport.emitChunk(streamId, { index: i });
+        messageHandler(channel, JSON.stringify({ type: 'chunk', seq: i, data: { index: i } }));
+      }
+
+      expect(firstRunChunks.map((c) => (c as { index: number }).index)).toEqual([0, 1, 2, 3, 4]);
+
+      firstSub.unsubscribe();
+
+      // Simulate another replica cleaning up the shared Redis sequence key
+      // before this replica's local preserved stream state is garbage-collected.
+      await mockPublisher.del(`stream:{${streamId}}:seq`);
+
+      const secondRunChunks: unknown[] = [];
+      transport.subscribe(streamId, {
+        onChunk: (event) => secondRunChunks.push(event),
+      });
+
+      await transport.syncReorderBuffer(streamId);
+
+      messageHandler(channel, JSON.stringify({ type: 'chunk', seq: 0, data: { index: 0 } }));
+
+      expect(secondRunChunks.map((c) => (c as { index: number }).index)).toEqual([0]);
+
       transport.destroy();
     });
   });

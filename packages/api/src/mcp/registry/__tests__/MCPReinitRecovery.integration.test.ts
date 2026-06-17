@@ -16,8 +16,8 @@
  */
 
 import * as net from 'net';
-import * as http from 'http';
 import { Keyv } from 'keyv';
+import * as http from 'http';
 import { Agent } from 'undici';
 import { Types } from 'mongoose';
 import { randomUUID } from 'crypto';
@@ -46,6 +46,8 @@ jest.mock('@librechat/data-schemas', () => ({
 
 jest.mock('~/auth', () => ({
   createSSRFSafeUndiciConnect: jest.fn(() => undefined),
+  isOAuthUrlAllowed: jest.fn(() => false),
+  isSSRFTarget: jest.fn(() => false),
   resolveHostnameSSRF: jest.fn(async () => false),
 }));
 

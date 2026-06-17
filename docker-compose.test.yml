@@ -45,6 +45,12 @@ services:
       - ALLOW_EMAIL_LOGIN=false
       - ALLOW_SOCIAL_LOGIN=false
       - OUTERSCORE_SSO_ENABLED=true
+      # Defense-in-depth clickjacking guard: the app emits its own
+      # `Content-Security-Policy: frame-ancestors 'self'` (not only the reverse
+      # proxy). 'self' fits the same-origin embed (chat served under /ai/chat on the
+      # parent's origin). The literal single quotes are required by CSP and are kept
+      # verbatim by compose. Use a space-separated origin list for a cross-origin host.
+      - OUTERSCORE_FRAME_ANCESTORS='self'
     volumes:
       - ./.env:/app/.env
       - ./librechat.test.yaml:/app/librechat.yaml

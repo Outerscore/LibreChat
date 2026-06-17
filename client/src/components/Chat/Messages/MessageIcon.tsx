@@ -4,8 +4,9 @@ import type { Assistant, Agent } from 'librechat-data-provider';
 import type { TMessageIcon } from '~/common';
 import ConvoIconURL from '~/components/Endpoints/ConvoIconURL';
 import { useGetEndpointsQuery } from '~/data-provider';
-import { getIconEndpoint } from '~/utils';
 import Icon from '~/components/Endpoints/Icon';
+import { isImageURL } from '~/utils/icons';
+import { getIconEndpoint } from '~/utils';
 
 type MessageIconProps = {
   iconData?: TMessageIcon;
@@ -64,7 +65,7 @@ const MessageIcon = memo(({ iconData, assistant, agent }: MessageIconProps) => {
     [endpointsConfig, endpoint],
   );
 
-  if (iconData?.isCreatedByUser !== true && iconURL != null && iconURL.includes('http')) {
+  if (iconData?.isCreatedByUser !== true && isImageURL(iconURL)) {
     return (
       <ConvoIconURL
         iconURL={iconURL}

@@ -1,4 +1,3 @@
-import logger from '~/config/winston';
 import {
   Capabilities,
   EModelEndpoint,
@@ -6,6 +5,7 @@ import {
   defaultAssistantsVersion,
 } from 'librechat-data-provider';
 import type { TCustomConfig, TAssistantEndpoint } from 'librechat-data-provider';
+import logger from '~/config/winston';
 
 /**
  * Sets up the minimum, default Assistants configuration if Azure OpenAI Assistants option is enabled.
@@ -52,6 +52,10 @@ export function assistantsConfigSetup(
 
   return {
     ...prevConfig,
+    version:
+      assistantsConfig?.version != null
+        ? parsedConfig.version
+        : (prevConfig.version ?? parsedConfig.version),
     retrievalModels: parsedConfig.retrievalModels,
     disableBuilder: parsedConfig.disableBuilder,
     pollIntervalMs: parsedConfig.pollIntervalMs,

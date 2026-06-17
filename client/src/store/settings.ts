@@ -1,7 +1,7 @@
 import { atom } from 'recoil';
 import { SettingsViews, LocalStorageKeys } from 'librechat-data-provider';
-import { atomWithLocalStorage } from '~/store/utils';
 import type { TOptionSettings } from '~/common';
+import { atomWithLocalStorage } from '~/store/utils';
 
 // Static atoms without localStorage
 const staticAtoms = {
@@ -50,6 +50,7 @@ const localStorageAtoms = {
   atCommand: atomWithLocalStorage('atCommand', true),
   plusCommand: atomWithLocalStorage('plusCommand', true),
   slashCommand: atomWithLocalStorage('slashCommand', true),
+  dollarCommand: atomWithLocalStorage('dollarCommand', true),
 
   // Speech settings
   conversationMode: atomWithLocalStorage('conversationMode', false),

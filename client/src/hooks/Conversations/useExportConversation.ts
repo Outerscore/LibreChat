@@ -1,5 +1,5 @@
-import download from 'downloadjs';
 import { useCallback } from 'react';
+import download from 'downloadjs';
 import { useParams } from 'react-router-dom';
 import exportFromJSON from 'export-from-json';
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,6 +20,7 @@ import type {
 import useBuildMessageTree from '~/hooks/Messages/useBuildMessageTree';
 import { useScreenshot } from '~/hooks/ScreenshotContext';
 import { cleanupPreset } from '~/utils';
+import { useLocalize } from '~/hooks';
 
 type ExportValues = {
   fieldName: string;
@@ -45,6 +46,7 @@ export default function useExportConversation({
   const queryClient = useQueryClient();
   const { captureScreenshot } = useScreenshot();
   const buildMessageTree = useBuildMessageTree();
+  const localize = useLocalize();
 
   const { conversationId: paramId } = useParams();
 
@@ -119,7 +121,7 @@ export default function useExportConversation({
         // CODE_INTERPRETER
         const toolCall = content[ContentTypes.TOOL_CALL];
         const code_interpreter = toolCall[ToolCallTypes.CODE_INTERPRETER];
-        return ['Code Interpreter', JSON.stringify(code_interpreter)];
+        return [localize('com_ui_run_code'), JSON.stringify(code_interpreter)];
       }
 
       if (type === ToolCallTypes.RETRIEVAL) {

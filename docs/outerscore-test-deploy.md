@@ -36,6 +36,11 @@ Browser ──HTTPS──> test.outerscore.com   (existing Apache/Nginx on the t
 - **Data:** MongoDB + Meilisearch run as containers with **named volumes** that survive redeploys.
 - **URL:** served under the subpath `/ai/chat` on the existing domain (same-origin with the
   Buyer app), so it reuses the existing TLS certificate.
+- **Seeded app content:** two Outerscore compliance agents auto-seed into MongoDB on first
+  boot and are shared to every user; the upstream **Skills** feature ships in the image and
+  is on by default. Both live in the database / the existing `mongo-data` + `uploads`
+  volumes — there is **no `/app/skill` mount** here (unlike the upstream `docker-compose.yml`),
+  and none is needed.
 
 ---
 
@@ -85,9 +90,12 @@ only; the reverse proxy reaches it there). No AWS CLI is needed.
 
 **(iii) Add the `/ai/chat` reverse-proxy rule** to the existing `test.outerscore.com` server
 config. The trailing slash on the upstream **strips** `/ai/chat`, so the app sees `/api/...`,
-`/assets/...`, `/health`. The `Content-Security-Policy` line is **required** — it allows the
-Buyer app to embed the chat in an iframe and blocks everyone else (the app has no built-in
-frame protection).
+`/assets/...`, `/health`. The `Content-Security-Policy` line keeps the proxy as an **outer**
+clickjacking guard — it allows the Buyer app to embed the chat in an iframe and blocks everyone
+else. The app now **also** emits `Content-Security-Policy: frame-ancestors 'self'` itself (driven
+by `OUTERSCORE_FRAME_ANCESTORS`, pinned in `docker-compose.test.yml`), so protection survives even
+if this proxy line is missing. Keep both; if you ever change the value, change it in both places so
+the two policies agree (the browser enforces the intersection of all CSP headers it receives).
 
 If the box uses **nginx**:
 ```nginx
@@ -177,6 +185,12 @@ OUTERSCORE_TOKEN_KEY_URL=https://test.outerscore.com/api/oauth/token_key
 OUTERSCORE_JWT_ISSUER=
 OUTERSCORE_JWT_AUDIENCE=
 OUTERSCORE_JWT_ENFORCE_CLAIMS=false
+
+# Optional — leave blank. The two compliance agents auto-seed and are shared to every
+# user regardless of these. Set them only to override the seeded model (default
+# claude-sonnet-4-6) or to grant one user edit rights on the rules in the agent builder.
+OUTERSCORE_COMPLIANCE_MODEL=
+OUTERSCORE_COMPLIANCE_OWNER_EMAIL=
 ```
 
 Notes:
@@ -191,6 +205,11 @@ Notes:
 - **`CREDS_KEY`/`CREDS_IV`: generate once and never change them** — rotating makes anything already
   encrypted in the database unreadable.
 - The selectable Claude models live in `librechat.test.yaml` (committed), not in this file.
+- **Compliance agents auto-seed.** On every startup the two Outerscore compliance agents are
+  created (if absent — a live builder edit is never overwritten) and shared PUBLIC, so they
+  appear in every user's agent picker with nothing to configure. The two `OUTERSCORE_COMPLIANCE_*`
+  vars above are optional overrides; the default model (`claude-sonnet-4-6`) is already in the
+  `librechat.test.yaml` model list.
 
 ### 4D. Confirm with the backend team
 **WHO: you → backend team.** Confirm the exact Spring **`/oauth/token_key`** URL (the public key
@@ -223,7 +242,8 @@ restarts the stack on the server.
    cd /opt/librechat
    docker compose -f docker-compose.test.yml exec api npm run create-user
    ```
-   Then sign in and send a message — a Claude reply should stream back.
+   Then sign in and send a message — a Claude reply should stream back. The agent picker
+   should also list the two auto-seeded **compliance agents** (shared to every user).
 4. **Embedded** (once the Buyer-app AI integration is shipped — see [caveat](#caveats)): open the
    Buyer test app, open the assistant, and confirm it signs you in with no second login.
 
@@ -306,6 +326,8 @@ Paste this to whoever manages `test.outerscore.com`. It's the only part that nee
 | `MEILI_MASTER_KEY` | secret | search service auth |
 | `ANTHROPIC_API_KEY` | secret | Claude API key |
 | `OUTERSCORE_TOKEN_KEY_URL` | secret | verifies Outerscore login tokens |
+| `OUTERSCORE_COMPLIANCE_MODEL` / `…_OWNER_EMAIL` | secret (optional) | override the seeded compliance-agent model / grant one user edit rights |
+| `OUTERSCORE_FRAME_ANCESTORS` | compose | app-level CSP `frame-ancestors` (clickjacking guard; `'self'` for the same-origin embed) |
 | `OUTERSCORE_SSO_ENABLED`, `NO_INDEX`, `TRUST_PROXY`, `ALLOW_*` | compose | fixed test-env settings |
 
 **Caveats**
@@ -315,3 +337,9 @@ Paste this to whoever manages `test.outerscore.com`. It's the only part that nee
 - **Secrets location:** this setup keeps the `.env` as a GitHub `test`-environment secret. If you
   prefer secrets to live only on the server (never in GitHub), that's a small workflow change —
   ask the maintainer.
+- **Build-time origin guard.** The image build **fails closed** if the parent origin isn't baked
+  in: CI passes `--build-arg REQUIRE_OUTERSCORE_PARENT_ORIGIN=true`, so an empty
+  `VITE_OUTERSCORE_PARENT_ORIGIN` aborts the build instead of shipping a bundle whose `postMessage`
+  bridge falls back to `'*'` (which would broadcast canvas/compliance content to any embedder and
+  trust any origin's SSO token). The test workflow sets the origin to `https://test.outerscore.com`;
+  emptying that line now breaks the build rather than silently shipping unsafe.

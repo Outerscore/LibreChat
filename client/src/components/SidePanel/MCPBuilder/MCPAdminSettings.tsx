@@ -1,15 +1,19 @@
-import { Permissions, PermissionTypes } from 'librechat-data-provider';
 import { useToastContext } from '@librechat/client';
-import { AdminSettingsDialog } from '~/components/ui';
-import { useUpdateMCPServersPermissionsMutation } from '~/data-provider';
-import { useLocalize } from '~/hooks';
+import { Permissions, PermissionTypes } from 'librechat-data-provider';
 import type { PermissionConfig } from '~/components/ui';
+import { useUpdateMCPServersPermissionsMutation } from '~/data-provider';
+import { AdminSettingsDialog } from '~/components/ui';
+import { useLocalize } from '~/hooks';
 
 const permissions: PermissionConfig[] = [
   { permission: Permissions.USE, labelKey: 'com_ui_mcp_servers_allow_use' },
   { permission: Permissions.CREATE, labelKey: 'com_ui_mcp_servers_allow_create' },
   { permission: Permissions.SHARE, labelKey: 'com_ui_mcp_servers_allow_share' },
   { permission: Permissions.SHARE_PUBLIC, labelKey: 'com_ui_mcp_servers_allow_share_public' },
+  {
+    permission: Permissions.CONFIGURE_OBO,
+    labelKey: 'com_ui_mcp_servers_allow_configure_obo',
+  },
 ];
 
 const MCPAdminSettings = () => {
