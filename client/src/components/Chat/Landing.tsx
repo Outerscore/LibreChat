@@ -11,9 +11,9 @@ import {
   CONFIG_HTML_MEDIA_ATTR,
 } from '~/utils';
 import { useChatContext, useAgentsMapContext, useAssistantsMapContext } from '~/Providers';
+import ConversationStarters from '~/components/Chat/Input/ConversationStarters';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
-import ConversationStarters from '~/components/Chat/Input/ConversationStarters';
 import ConvoIcon from '~/components/Endpoints/ConvoIcon';
 import { useLocalize, useAuthContext } from '~/hooks';
 

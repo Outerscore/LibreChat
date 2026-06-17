@@ -1,6 +1,6 @@
+import { Button } from '@librechat/client';
 import { TriangleAlert, MousePointerClick } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Button } from '@librechat/client';
 import { cn } from '~/utils';
 
 type SkillStateVariant = 'empty' | 'error';

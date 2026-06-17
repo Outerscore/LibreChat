@@ -1,5 +1,5 @@
-import type { DeepPartial, TCustomConfig } from 'librechat-data-provider';
 import { EModelEndpoint, defaultAssistantsVersion } from 'librechat-data-provider';
+import type { DeepPartial, TCustomConfig } from 'librechat-data-provider';
 import { AppService, loadSummarizationConfig } from './service';
 import logger from '~/config/winston';
 

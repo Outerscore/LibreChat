@@ -1,9 +1,9 @@
 import type { FilterQuery, Model, SortOrder, Types } from 'mongoose';
-import logger from '~/config/winston';
-import { isValidObjectIdString } from '~/utils/objectId';
-import { buildRetentionVisibilityFilter } from '~/utils/retention';
-import { escapeRegExp } from '~/utils/string';
 import type { IChatProject, IChatProjectDocument, IConversation } from '~/types';
+import { buildRetentionVisibilityFilter } from '~/utils/retention';
+import { isValidObjectIdString } from '~/utils/objectId';
+import { escapeRegExp } from '~/utils/string';
+import logger from '~/config/winston';
 
 export type ChatProjectSortBy = 'name' | 'createdAt' | 'lastConversationAt';
 export type ChatProjectSortDirection = 'asc' | 'desc';

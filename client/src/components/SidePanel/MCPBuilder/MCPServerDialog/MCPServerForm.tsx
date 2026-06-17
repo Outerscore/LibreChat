@@ -1,13 +1,13 @@
 import { FormProvider, useWatch } from 'react-hook-form';
 import { Permissions, PermissionTypes } from 'librechat-data-provider';
-import { useHasAccess } from '~/hooks';
 import type { useMCPServerForm, MCPServerFormData } from './hooks/useMCPServerForm';
-import { AuthTypeEnum } from './hooks/useMCPServerForm';
 import ConnectionSection from './sections/ConnectionSection';
 import BasicInfoSection from './sections/BasicInfoSection';
 import TransportSection from './sections/TransportSection';
+import { AuthTypeEnum } from './hooks/useMCPServerForm';
 import TrustSection from './sections/TrustSection';
 import AuthSection from './sections/AuthSection';
+import { useHasAccess } from '~/hooks';
 
 interface MCPServerFormProps {
   formHook: ReturnType<typeof useMCPServerForm>;

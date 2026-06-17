@@ -1,5 +1,5 @@
-import type { RedisClientType, RedisClusterType } from '@redis/client';
 import { logger } from '@librechat/data-schemas';
+import type { RedisClientType, RedisClusterType } from '@redis/client';
 import { cacheConfig } from './cacheConfig';
 
 /**

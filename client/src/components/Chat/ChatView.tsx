@@ -14,8 +14,8 @@ import {
   useLocalize,
 } from '~/hooks';
 import { ChatContext, AddedChatContext, ChatFormProvider, useFileMapContext } from '~/Providers';
-import ConversationStarters from './Input/ConversationStarters';
 import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
+import ConversationStarters from './Input/ConversationStarters';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import ProjectLandingChip from './ProjectLandingChip';
 import MessagesView from './Messages/MessagesView';

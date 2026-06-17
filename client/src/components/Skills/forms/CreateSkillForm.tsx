@@ -11,9 +11,9 @@ import {
 } from 'librechat-data-provider';
 import type { TSkill, TCreateSkill, TSkillWarning } from 'librechat-data-provider';
 import { useCreateSkillMutation } from '~/data-provider';
-import { useLocalize } from '~/hooks';
 import SkillContentEditor from './SkillContentEditor';
 import CategorySelector from './CategorySelector';
+import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 const DEFAULT_BODY = `# Overview

@@ -11,8 +11,8 @@ import {
 } from '@librechat/client';
 import type { TChatProject } from 'librechat-data-provider';
 import { useAssignConversationToProjectMutation, useProjectsInfiniteQuery } from '~/data-provider';
-import { useLocalize } from '~/hooks';
 import { NotificationSeverity } from '~/common';
+import { useLocalize } from '~/hooks';
 
 type ProjectButtonProps = {
   conversationId: string;

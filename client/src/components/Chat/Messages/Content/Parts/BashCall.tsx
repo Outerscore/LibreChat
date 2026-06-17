@@ -2,13 +2,13 @@ import { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import copy from 'copy-to-clipboard';
 import type { TAttachment } from 'librechat-data-provider';
 import ProgressText from '~/components/Chat/Messages/Content/ProgressText';
+import parseJsonField, { areToolCallArgsComplete } from './parseJsonField';
 import CopyButton from '~/components/Messages/Content/CopyButton';
 import LangIcon from '~/components/Messages/Content/LangIcon';
 import useToolCallState from './useToolCallState';
 import useLazyHighlight from './useLazyHighlight';
 import { ERROR_PATTERNS } from './ExecuteCode';
 import { AttachmentGroup } from './Attachment';
-import parseJsonField, { areToolCallArgsComplete } from './parseJsonField';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 

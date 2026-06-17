@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
+import { Plus, Trash2, Key, ShieldEllipsis } from 'lucide-react';
+import { Permissions, PermissionTypes } from 'librechat-data-provider';
 import {
   useGetAgentApiKeysQuery,
   useCreateAgentApiKeyMutation,
   useDeleteAgentApiKeyMutation,
 } from 'librechat-data-provider/react-query';
-import { Permissions, PermissionTypes } from 'librechat-data-provider';
-import { Plus, Trash2, Key, ShieldEllipsis } from 'lucide-react';
 import {
   Button,
   Input,
@@ -22,8 +22,8 @@ import {
 } from '@librechat/client';
 import type { PermissionConfig } from '~/components/ui';
 import { useUpdateRemoteAgentsPermissionsMutation } from '~/data-provider';
-import { useLocalize } from '~/hooks';
 import { AdminSettingsDialog } from '~/components/ui';
+import { useLocalize } from '~/hooks';
 
 function CreateKeyDialog({ onKeyCreated }: { onKeyCreated?: () => void }) {
   const localize = useLocalize();

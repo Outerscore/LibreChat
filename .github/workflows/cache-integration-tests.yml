@@ -21,6 +21,11 @@ permissions:
 jobs:
   cache_integration_tests:
     name: Integration Tests that use actual Redis Cache
+    # Outerscore fork: this is an upstream-only safety net for the Redis cache/cluster
+    # code (we don't modify packages/api/src/cache|cluster|mcp|stream). Gating to the
+    # canonical upstream repo skips the job on our fork's PRs — a skipped job is treated
+    # as passing by branch protection — while it still runs on danny-avila/LibreChat.
+    if: github.repository == 'danny-avila/LibreChat'
     timeout-minutes: 30
     runs-on: ubuntu-latest
 

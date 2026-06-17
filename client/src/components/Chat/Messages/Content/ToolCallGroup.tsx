@@ -10,12 +10,12 @@ import type {
 } from 'librechat-data-provider';
 import type { PartWithIndex } from './ParallelContent';
 import { useLocalize, useExpandCollapse, scheduleMessageContentLayoutReconcile } from '~/hooks';
+import { isBashProgrammaticToolCall } from './routing';
 import { cn, getToolDisplayLabel } from '~/utils';
 import { StackedToolIcons } from './ToolOutput';
 import { useMCPIconMap } from '~/hooks/MCP';
 import { AttachmentGroup } from './Parts';
 import store from '~/store';
-import { isBashProgrammaticToolCall } from './routing';
 
 interface ToolMeta {
   name: string;

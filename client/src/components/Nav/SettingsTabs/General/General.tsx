@@ -2,10 +2,10 @@ import React, { useContext, useCallback } from 'react';
 import Cookies from 'js-cookie';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { Dropdown, Spinner, ThemeContext } from '@librechat/client';
+import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import ArchivedChats from './ArchivedChats';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLocalize } from '~/hooks';
-import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import store from '~/store';
 
 const toggleSwitchConfigs = [

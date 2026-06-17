@@ -13,7 +13,6 @@ import {
   BashProgrammaticToolCallingDefinition,
   createBashProgrammaticToolCallingTool,
 } from '@librechat/agents';
-import type { AgentToolOptions } from 'librechat-data-provider';
 import type {
   LCToolRegistry,
   JsonSchemaType,
@@ -21,6 +20,7 @@ import type {
   GenericTool,
   LCTool,
 } from '@librechat/agents';
+import type { AgentToolOptions } from 'librechat-data-provider';
 
 export type { LCTool, LCToolRegistry, AllowedCaller, JsonSchemaType };
 

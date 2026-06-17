@@ -40,8 +40,8 @@ import {
   streamStatusQueryKey,
 } from '~/data-provider';
 import useEventHandlers, { buildCreatedInitialResponse } from './useEventHandlers';
-import { useAuthContext } from '~/hooks/AuthContext';
 import { createCanvasStreamBridge } from './canvasStream';
+import { useAuthContext } from '~/hooks/AuthContext';
 import useUsageHandler from './useUsageHandler';
 import store from '~/store';
 

@@ -3,8 +3,8 @@ import { SpanStatusCode, trace } from '@opentelemetry/api';
 import type { NextFunction, Response } from 'express';
 import type { Span } from '@opentelemetry/api';
 import type { ServerRequest } from '~/types';
-import { getTelemetryRequestSpan } from './sdk';
 import { telemetryErrorMiddleware, telemetryMiddleware } from './middleware';
+import { getTelemetryRequestSpan } from './sdk';
 
 jest.mock('./sdk', () => ({
   getTelemetryRequestSpan: jest.fn(),

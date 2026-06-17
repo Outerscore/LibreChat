@@ -7,9 +7,6 @@ import type {
   Agents,
 } from 'librechat-data-provider';
 import type { ToolCallGroupExpansionState } from './ToolCallGroup';
-import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
-import { mapAttachments, groupSequentialToolCalls } from '~/utils';
-import { MessageContext, SearchContext } from '~/Providers';
 import {
   CanvasWritingIndicator,
   CanvasDoneIndicator,
@@ -23,6 +20,9 @@ import {
   isComplianceReplyText,
   shouldMaskCanvasReply,
 } from '~/utils/canvas';
+import { ParallelContentRenderer, type PartWithIndex } from './ParallelContent';
+import { mapAttachments, groupSequentialToolCalls } from '~/utils';
+import { MessageContext, SearchContext } from '~/Providers';
 import PendingSkillCall from './Parts/PendingSkillCall';
 import { EditTextPart, EmptyText } from './Parts';
 import MemoryArtifacts from './MemoryArtifacts';

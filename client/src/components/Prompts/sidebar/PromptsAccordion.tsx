@@ -1,9 +1,9 @@
 import { SystemRoles } from 'librechat-data-provider';
-import { useAuthContext } from '~/hooks';
-import { AdminSettings } from '~/components/Prompts';
 import AutoSendPrompt from '../buttons/AutoSendPrompt';
+import { AdminSettings } from '~/components/Prompts';
 import PromptSidePanel from './GroupSidePanel';
 import FilterPrompts from './FilterPrompts';
+import { useAuthContext } from '~/hooks';
 
 export default function PromptsAccordion() {
   const { user } = useAuthContext();

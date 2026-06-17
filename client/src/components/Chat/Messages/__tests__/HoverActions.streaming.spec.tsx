@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
-import { RecoilRoot, type MutableSnapshot } from 'recoil';
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { RecoilRoot, type MutableSnapshot } from 'recoil';
+import { render, screen, act } from '@testing-library/react';
 import { QueryKeys, type TConversation, type TMessage } from 'librechat-data-provider';
-import { ChatContext, MessagesViewProvider, useChatContext } from '~/Providers';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useLatestMessage, useLatestMessageId } from '~/hooks/Messages/useLatestMessage';
+import { ChatContext, MessagesViewProvider, useChatContext } from '~/Providers';
 import Message from '~/components/Chat/Messages/Message';
 import store from '~/store';
 

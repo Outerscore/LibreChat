@@ -1,10 +1,10 @@
+import type { AuthLogRequest, AuthLogState } from './auth';
 import {
   buildSafeAuthLogContext,
   formatAuthLogMessage,
   getAuthFailureErrorName,
   getAuthFailureReason,
 } from './auth';
-import type { AuthLogRequest, AuthLogState } from './auth';
 
 function createRequest(overrides: Partial<AuthLogRequest> = {}): AuthLogRequest {
   return {

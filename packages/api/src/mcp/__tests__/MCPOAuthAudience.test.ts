@@ -10,10 +10,10 @@
  * request body it receives.
  */
 
-import * as http from 'http';
 import * as net from 'net';
-import type { Socket } from 'net';
+import * as http from 'http';
 import { TokenExchangeMethodEnum } from 'librechat-data-provider';
+import type { Socket } from 'net';
 import { MCPOAuthHandler } from '~/mcp/oauth';
 
 jest.mock('@librechat/data-schemas', () => ({

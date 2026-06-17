@@ -3,8 +3,8 @@ import { Copy, CopyCheck } from 'lucide-react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { Permissions, PermissionTypes } from 'librechat-data-provider';
 import { Label, Input, Checkbox, SecretInput, Radio, useToastContext } from '@librechat/client';
-import { AuthTypeEnum, AuthorizationTypeEnum } from '../hooks/useMCPServerForm';
 import type { MCPServerFormData } from '../hooks/useMCPServerForm';
+import { AuthTypeEnum, AuthorizationTypeEnum } from '../hooks/useMCPServerForm';
 import { useLocalize, useCopyToClipboard, useHasAccess } from '~/hooks';
 import { cn } from '~/utils';
 

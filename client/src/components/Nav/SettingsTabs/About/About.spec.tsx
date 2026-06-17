@@ -1,7 +1,7 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Constants } from 'librechat-data-provider';
+import { act, render, screen } from '@testing-library/react';
 import type { TStartupConfig } from 'librechat-data-provider';
 import About from './About';
 

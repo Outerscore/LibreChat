@@ -3,7 +3,6 @@ import type { ZodIssue } from 'zod';
 import type * as a from './types/assistants';
 import type * as s from './schemas';
 import type * as t from './types';
-import { ContentTypes } from './types/runs';
 import {
   openAISchema,
   openRouterSchema,
@@ -18,6 +17,7 @@ import {
   compactAssistantSchema,
 } from './schemas';
 import { bedrockInputSchema } from './bedrock';
+import { ContentTypes } from './types/runs';
 import { alternateName } from './config';
 
 type EndpointSchema =

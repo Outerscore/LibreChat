@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useQueryClient } from '@tanstack/react-query';
 import { useSetRecoilState } from 'recoil';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   request,
   UsageEvents,
@@ -14,8 +14,8 @@ import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
-import { useAuthContext } from '~/hooks/AuthContext';
 import { createCanvasStreamBridge } from './canvasStream';
+import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import useUsageHandler from './useUsageHandler';
 import { clearAllDrafts } from '~/utils';

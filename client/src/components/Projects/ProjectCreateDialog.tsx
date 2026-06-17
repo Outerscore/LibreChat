@@ -7,7 +7,6 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from 'react';
-import type { TChatProject } from 'librechat-data-provider';
 import {
   Button,
   Input,
@@ -17,6 +16,7 @@ import {
   Spinner,
   useToastContext,
 } from '@librechat/client';
+import type { TChatProject } from 'librechat-data-provider';
 import { useCreateProjectMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 

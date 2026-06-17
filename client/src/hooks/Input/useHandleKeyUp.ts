@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useSetRecoilState, useRecoilValue } from 'recoil';
 import { PermissionTypes, Permissions, isAssistantsEndpoint } from 'librechat-data-provider';
 import useAgentCapabilities from '~/hooks/Agents/useAgentCapabilities';
+import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import useGetAgentsConfig from '~/hooks/Agents/useGetAgentsConfig';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
-import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import store from '~/store';
 
 /** Event keys that shouldn't trigger a command */

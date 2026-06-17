@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import type * as t from '~/types';
+import balanceSchema from '~/schema/balance';
 import { createUserMethods } from './user';
 import userSchema from '~/schema/user';
-import balanceSchema from '~/schema/balance';
 
 /** Mocking crypto for generateToken */
 jest.mock('~/crypto', () => ({

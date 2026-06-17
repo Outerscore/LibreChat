@@ -1,8 +1,8 @@
 import type { BedrockDocumentFormat } from 'librechat-data-provider';
 import type { IMongoFile } from '@librechat/data-schemas';
 import type { Readable } from 'stream';
-import type { ServerRequest } from './http';
 import type { DownloadURLParams } from '~/storage/types';
+import type { ServerRequest } from './http';
 export interface STTService {
   getInstance(): Promise<STTService>;
   getProviderSchema(req: ServerRequest): Promise<[string, object]>;

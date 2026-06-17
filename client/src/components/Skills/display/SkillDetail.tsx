@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Eye, Code, User, Calendar, EarthIcon, ScrollText } from 'lucide-react';
 import { TooltipAnchor } from '@librechat/client';
+import { Eye, Code, User, Calendar, EarthIcon, ScrollText } from 'lucide-react';
 import type { TSkill } from 'librechat-data-provider';
 import { useLocalize, useAuthContext, useSkillPermissions, useSkillActiveState } from '~/hooks';
-import { ShareSkill, SkillToggle } from '../buttons';
 import SkillMarkdownRenderer from './SkillMarkdownRenderer';
-import { parseFrontmatter } from '../utils';
+import { ShareSkill, SkillToggle } from '../buttons';
 import DeleteSkill from '../dialogs/DeleteSkill';
+import { parseFrontmatter } from '../utils';
 import { cn } from '~/utils';
 
 interface SkillDetailProps {

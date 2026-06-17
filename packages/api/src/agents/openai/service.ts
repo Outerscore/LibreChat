@@ -31,6 +31,7 @@ import type {
   ToolCall,
 } from './types';
 import type { OpenAIStreamHandlerConfig, EventHandler } from './handlers';
+import type { ToolExecuteOptions } from '../handlers';
 import {
   createOpenAIContentAggregator,
   createOpenAIStreamTracker,
@@ -40,7 +41,6 @@ import {
   writeSSE,
 } from './handlers';
 import { createSafeUser } from '~/utils';
-import type { ToolExecuteOptions } from '../handlers';
 
 /**
  * Dependencies for the chat completion service

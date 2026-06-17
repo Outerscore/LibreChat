@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Plus, PenLine, Upload } from 'lucide-react';
 import { Dropdown } from '@librechat/client';
+import { Plus, PenLine, Upload } from 'lucide-react';
 import type { Option } from '~/common';
 import { CreateSkillDialog, UploadSkillDialog } from '../dialogs';
 import { useLocalize } from '~/hooks';

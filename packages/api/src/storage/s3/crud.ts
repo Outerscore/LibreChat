@@ -1,5 +1,8 @@
 import fs from 'fs';
 import { Readable } from 'stream';
+import { logger } from '@librechat/data-schemas';
+import { FileSources } from 'librechat-data-provider';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   UploadPartCommand,
   PutObjectCommand,
@@ -10,16 +13,12 @@ import {
   HeadObjectCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-import { logger } from '@librechat/data-schemas';
-import { FileSources } from 'librechat-data-provider';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type {
   CompletedPart,
   GetObjectCommandInput,
   PutObjectCommandInput,
 } from '@aws-sdk/client-s3';
 import type { TFile } from 'librechat-data-provider';
-import type { ServerRequest } from '~/types';
 import type {
   UploadFileParams,
   SaveBufferParams,
@@ -32,6 +31,13 @@ import type {
   UrlBuilder,
   S3FileRef,
 } from '~/storage/types';
+import type { ServerRequest } from '~/types';
+import {
+  AVATAR_BASE_PATH,
+  DEFAULT_BASE_PATH as defaultBasePath,
+  INLINE_AVATAR_PATH_PREFIX,
+  INLINE_IMAGE_PATH_PREFIX,
+} from '~/storage/constants';
 import {
   assertS3FileName,
   assertPathSegment,
@@ -39,12 +45,6 @@ import {
 } from '~/storage/validation';
 import { initializeS3 } from '~/cdn/s3';
 import { deleteRagFile } from '~/files';
-import {
-  AVATAR_BASE_PATH,
-  DEFAULT_BASE_PATH as defaultBasePath,
-  INLINE_AVATAR_PATH_PREFIX,
-  INLINE_IMAGE_PATH_PREFIX,
-} from '~/storage/constants';
 import { s3Config } from './s3Config';
 
 const {

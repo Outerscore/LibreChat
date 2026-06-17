@@ -2,9 +2,9 @@ import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
 import { Constants } from 'librechat-data-provider';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import { createShareMethods, type ShareMethods } from './share';
 import type { SchemaWithMeiliMethods } from '~/models/plugins/mongoMeili';
 import type * as t from '~/types';
+import { createShareMethods, type ShareMethods } from './share';
 
 describe('Share Methods', () => {
   let mongoServer: MongoMemoryServer;

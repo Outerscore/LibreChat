@@ -4,8 +4,8 @@
  * agents `ToolNode` (forward to codeapi). This file just pins the
  * shape so a future refactor can't silently widen or narrow the
  * fields without surfacing here. */
-import { CODE_ENV_KINDS } from './codeEnvRef';
 import type { CodeEnvKind, CodeEnvRef } from './codeEnvRef';
+import { CODE_ENV_KINDS } from './codeEnvRef';
 
 describe('CodeEnvRef', () => {
   it('accepts the canonical shape for kind: skill', () => {

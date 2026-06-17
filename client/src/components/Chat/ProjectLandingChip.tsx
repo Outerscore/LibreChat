@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Folder, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { ControlCombobox, TooltipAnchor } from '@librechat/client';
 import type { TChatProject } from 'librechat-data-provider';
 import type { OptionWithIcon } from '~/common';

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
 import { Skeleton } from '@librechat/client';
+import { useSearchParams } from 'react-router-dom';
 import type { TSkill } from 'librechat-data-provider';
-import { useLocalize } from '~/hooks';
 import SkillListItem from './SkillListItem';
+import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 interface SkillListProps {

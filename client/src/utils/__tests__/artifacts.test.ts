@@ -1,3 +1,4 @@
+import type { ToolArtifactType } from '../artifacts';
 import {
   buildSandpackOptions,
   detectArtifactTypeFromFile,
@@ -7,7 +8,6 @@ import {
   languageForFilename,
   TOOL_ARTIFACT_TYPES,
 } from '../artifacts';
-import type { ToolArtifactType } from '../artifacts';
 
 const TAILWIND_CDN = 'https://cdn.tailwindcss.com/3.4.17#tailwind.js';
 
