@@ -22,7 +22,7 @@ function getStrokeClass(percent: number, indeterminate: boolean): string {
   if (percent > 75) {
     return 'stroke-yellow-500';
   }
-  return 'stroke-text-secondary';
+  return 'stroke-brand-purple';
 }
 
 export default function Gauge({ percent, indeterminate }: GaugeProps) {

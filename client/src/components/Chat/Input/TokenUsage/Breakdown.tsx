@@ -88,7 +88,7 @@ export default function Breakdown({ view, showCost, currency }: BreakdownProps) 
       >
         {percent > 0 && (
           <div
-            className="h-full rounded-full bg-text-primary transition-all duration-300"
+            className="h-full rounded-full bg-brand-purple transition-all duration-300"
             style={{ width: `${Math.min(percent, 100)}%` }}
           />
         )}
