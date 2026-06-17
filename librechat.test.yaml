@@ -1,7 +1,7 @@
 # Outerscore TEST LibreChat config (tracked — the local `librechat.yaml` is gitignored).
 # Shipped to the host by .github/workflows/deploy-test.yml and bind-mounted into the
 # container at /app/librechat.yaml (see docker-compose.test.yml).
-version: 1.3.8
+version: 1.3.13
 cache: true
 
 interface:
