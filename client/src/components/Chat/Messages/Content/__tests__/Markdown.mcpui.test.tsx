@@ -1,16 +1,21 @@
+// sort-imports-ignore — import order is load-bearing here. The jest.mock of
+// '~/Providers' (a barrel with circular deps) only applies to MCPUIResource's
+// hook imports when `Markdown` is imported before the Provider hooks; the
+// auto-sorted order makes useOptionalMessagesOperations resolve to the real
+// (undefined-returning) hook and the test fails. Keep upstream's order.
 import React from 'react';
-import { RecoilRoot } from 'recoil';
 import { render, screen } from '@testing-library/react';
+import Markdown from '../Markdown';
+import MarkdownLite from '../MarkdownLite';
+import { RecoilRoot } from 'recoil';
+import { UI_RESOURCE_MARKER } from '~/components/MCPUIResource/plugin';
 import {
   useMessageContext,
   useOptionalMessagesConversation,
   useOptionalMessagesOperations,
 } from '~/Providers';
-import { UI_RESOURCE_MARKER } from '~/components/MCPUIResource/plugin';
 import { useGetMessagesByConvoId } from '~/data-provider';
-import MarkdownLite from '../MarkdownLite';
 import { useLocalize } from '~/hooks';
-import Markdown from '../Markdown';
 
 // Mocks for hooks used by MCPUIResource when rendered inside Markdown.
 // Keep Provider components intact while mocking only the hooks we use.
