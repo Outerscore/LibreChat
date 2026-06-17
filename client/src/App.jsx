@@ -8,6 +8,7 @@ import { Toast, ThemeProvider, ToastProvider } from '@librechat/client';
 import { QueryClient, QueryClientProvider, QueryCache } from '@tanstack/react-query';
 import { ScreenshotProvider, useApiErrorBoundary } from './hooks';
 import useOuterscoreLanguageBridge from '~/hooks/useOuterscoreLanguageBridge';
+import { isOuterscoreContext } from '~/hooks/useOuterscoreAutoLogin';
 import WakeLockManager from '~/components/System/WakeLockManager';
 import QueryDevtoolsGate from '~/components/QueryDevtoolsGate';
 import LanguageSync from '~/components/System/LanguageSync';
@@ -73,7 +74,7 @@ const App = () => {
                   <RouterProvider router={router} />
                   <OuterscoreBridges />
                   <WakeLockManager />
-                  <QueryDevtoolsGate />
+                  {!isOuterscoreContext() && <QueryDevtoolsGate />}
                   <Toast />
                   <RadixToast.Viewport className="pointer-events-none fixed inset-0 z-[1000] mx-auto my-2 flex max-w-[560px] flex-col items-stretch justify-start md:pb-5" />
                 </DndProvider>
