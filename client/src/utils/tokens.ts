@@ -1,3 +1,4 @@
+import i18next from 'i18next';
 import { Tools, Constants, inputTokensIncludesCache } from 'librechat-data-provider';
 import type { TMessage, TResponseUsage, TTokenUsageEvent } from 'librechat-data-provider';
 
@@ -503,8 +504,8 @@ export function normalizeUsageUnits(usage: TTokenUsageEvent): CostUnits {
   };
 }
 
-export function formatTokens(count: number): string {
-  const formatted = new Intl.NumberFormat(undefined, {
+export function formatTokens(count: number, locale: string = i18next.language): string {
+  const formatted = new Intl.NumberFormat(locale || undefined, {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(count);
