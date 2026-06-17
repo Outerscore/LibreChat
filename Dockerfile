@@ -25,6 +25,18 @@ ARG NPM_CI_ATTEMPTS=2
 ARG VITE_OUTERSCORE_PARENT_ORIGIN=""
 ENV VITE_OUTERSCORE_PARENT_ORIGIN=${VITE_OUTERSCORE_PARENT_ORIGIN}
 
+# Fail closed for real deployments. An empty parent origin makes the client's
+# postMessage bridge fall back to '*' — broadcasting canvas/compliance content to
+# any embedder and trusting any origin's SSO token. CI/prod builds pass
+# --build-arg REQUIRE_OUTERSCORE_PARENT_ORIGIN=true so a forgotten origin fails the
+# build instead of silently shipping the wildcard; local/dev builds may leave it unset.
+ARG REQUIRE_OUTERSCORE_PARENT_ORIGIN=false
+RUN if [ "$REQUIRE_OUTERSCORE_PARENT_ORIGIN" = "true" ] && [ -z "$VITE_OUTERSCORE_PARENT_ORIGIN" ]; then \
+        echo "ERROR: REQUIRE_OUTERSCORE_PARENT_ORIGIN=true but VITE_OUTERSCORE_PARENT_ORIGIN is empty." >&2 ; \
+        echo "       Pass --build-arg VITE_OUTERSCORE_PARENT_ORIGIN=<parent origin>, e.g. https://test.outerscore.com" >&2 ; \
+        exit 1 ; \
+    fi
+
 RUN mkdir -p /app && chown node:node /app
 WORKDIR /app
 
