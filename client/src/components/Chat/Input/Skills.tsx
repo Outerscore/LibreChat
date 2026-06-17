@@ -30,7 +30,7 @@ function Skills() {
         checked={skillsActive}
         setValue={debouncedChange}
         label={localize('com_ui_skills')}
-        isCheckedClassName="border-cyan-600/40 bg-cyan-500/10 hover:bg-cyan-700/10"
+        isCheckedClassName="border-primary/40 bg-primary/10 hover:bg-primary/20"
         icon={<ScrollText className="icon-md" aria-hidden="true" />}
       />
     )
