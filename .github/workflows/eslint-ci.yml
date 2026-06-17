@@ -61,6 +61,7 @@ jobs:
 
           # Run ESLint
           npx eslint --no-error-on-unmatched-pattern \
+            --no-warn-ignored \
             --config eslint.config.mjs \
             --max-warnings=0 \
             -- "${CHANGED_FILES[@]}"
