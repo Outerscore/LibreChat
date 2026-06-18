@@ -35,6 +35,7 @@ import {
   logger,
 } from '~/utils';
 import { useDeleteFilesMutation, useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
+import { OUTERSCORE_DEFAULT_PRESET, hasExplicitConvoSelection } from '~/utils/outerscoreDefaults';
 import useGetConversation from './Conversations/useGetConversation';
 import useAssistantListMap from './Assistants/useAssistantListMap';
 import { useResetChatBadges } from './useChatBadges';
@@ -334,6 +335,14 @@ const useNewConvo = (index = 0) => {
               Object.keys(_template).filter((key) => key !== 'chatProjectId').length === 0);
       if (!preset && startupConfig && shouldApplyModelSpec && defaultModelSpec) {
         preset = getModelSpecPreset(defaultModelSpec);
+      }
+
+      // A brand-new chat with no explicit selection defaults to the Outerscore
+      // Sonnet model rather than restoring the persisted last-selected model. The
+      // selection is still carried across close/open/pin/unpin (in-memory state)
+      // and history selection (each conversation loads its own saved model).
+      if (!preset && !hasExplicitConvoSelection(template)) {
+        preset = OUTERSCORE_DEFAULT_PRESET;
       }
 
       const prevConversation = getConversation();
