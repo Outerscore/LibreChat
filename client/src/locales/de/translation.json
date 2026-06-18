@@ -302,6 +302,7 @@
   "com_endpoint_message": "Nachricht an",
   "com_endpoint_message_new": "Nachricht an {{0}}",
   "com_endpoint_message_not_appendable": "Bearbeite deine Nachricht oder generiere neu.",
+  "com_endpoint_please_enter": "Bitte eingeben",
   "com_endpoint_my_preset": "Meine Voreinstellung",
   "com_endpoint_no_presets": "Noch keine Voreinstellungen, verwende die KI-Einstellungsschaltfläche, um eine Voreinstellung zu erstellen",
   "com_endpoint_openai_custom_name_placeholder": "Lege einen benutzerdefinierten Namen für die KI fest.",
