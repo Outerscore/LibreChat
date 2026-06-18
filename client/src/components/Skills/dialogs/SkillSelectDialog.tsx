@@ -14,6 +14,7 @@ import {
   useSkillFavorites,
 } from '~/hooks';
 import { useListSkillsQuery } from '~/data-provider';
+import { HIDDEN_SKILL_CATEGORIES } from '~/components/Skills/utils';
 import { CategoryIcon } from '~/components/Prompts';
 import { cn } from '~/utils';
 
@@ -183,7 +184,11 @@ function SkillSelectDialog({ isOpen, setIsOpen }: SkillSelectDialogProps) {
   });
 
   const { data: skillsData } = useListSkillsQuery(LIST_QUERY_OPTIONS);
-  const { categories } = useCategories({ className: 'size-4', hasAccess: true });
+  const { categories } = useCategories({
+    className: 'size-4',
+    hasAccess: true,
+    exclude: HIDDEN_SKILL_CATEGORIES,
+  });
   const typedCategories = categories as SkillCategory[] | undefined;
 
   const allSkills = useMemo(() => skillsData?.skills ?? [], [skillsData?.skills]);

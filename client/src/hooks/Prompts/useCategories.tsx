@@ -17,22 +17,26 @@ const emptyCategory: { label: TranslationKeys; value: string } = {
 const useCategories = ({
   className = '',
   hasAccess = true,
+  exclude = [],
 }: {
   className?: string;
   hasAccess?: boolean;
+  exclude?: string[];
 }) => {
   const localize = useLocalize();
 
   const { data: categories = loadingCategories } = useGetCategories({
     enabled: hasAccess,
     select: (data) =>
-      data.map((category) => ({
-        label: localize(category.label as TranslationKeys),
-        value: category.value,
-        icon: category.value ? (
-          <CategoryIcon category={category.value} className={className} />
-        ) : null,
-      })),
+      data
+        .filter((category) => !exclude.includes(category.value))
+        .map((category) => ({
+          label: localize(category.label as TranslationKeys),
+          value: category.value,
+          icon: category.value ? (
+            <CategoryIcon category={category.value} className={className} />
+          ) : null,
+        })),
   });
 
   return { categories, emptyCategory };

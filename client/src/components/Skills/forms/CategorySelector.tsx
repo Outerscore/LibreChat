@@ -5,6 +5,7 @@ import { useFormContext, Controller } from 'react-hook-form';
 import type { MenuItemProps } from '@librechat/client';
 import type { ReactNode } from 'react';
 import { useCategories, useLocalize } from '~/hooks';
+import { HIDDEN_SKILL_CATEGORIES } from '~/components/Skills/utils';
 import { cn } from '~/utils';
 
 interface CategorySelectorProps {
@@ -15,7 +16,10 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({ className = '' }) =
   const localize = useLocalize();
   const { control, watch, setValue } = useFormContext();
   const [isOpen, setIsOpen] = useState(false);
-  const { categories, emptyCategory } = useCategories({ hasAccess: true });
+  const { categories, emptyCategory } = useCategories({
+    hasAccess: true,
+    exclude: HIDDEN_SKILL_CATEGORIES,
+  });
 
   const watchedCategory = watch('category') as string | undefined;
 
