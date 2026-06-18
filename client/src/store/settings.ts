@@ -17,9 +17,15 @@ const staticAtoms = {
 const localStorageAtoms = {
   // General settings
   autoScroll: atomWithLocalStorage('autoScroll', false),
+  // Default collapsed when embedded in Outerscore (iframe) or on a narrow screen. Root
+  // additionally forces it collapsed on every embedded boot (each AI-assist trigger
+  // remounts the iframe), so the chat — not the sidebar — shows on open.
   sidebarExpanded: atomWithLocalStorage(
     'unifiedSidebarExpanded',
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches ? false : true,
+    typeof window !== 'undefined' &&
+      (window.parent !== window || window.matchMedia('(max-width: 800px)').matches)
+      ? false
+      : true,
   ),
   enableUserMsgMarkdown: atomWithLocalStorage<boolean>(
     LocalStorageKeys.ENABLE_USER_MSG_MARKDOWN,

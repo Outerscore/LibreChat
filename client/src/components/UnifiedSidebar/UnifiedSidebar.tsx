@@ -1,11 +1,12 @@
 import { useCallback, useState, useEffect, useRef, memo, startTransition } from 'react';
-import type { ReactNode } from 'react';
 import { useRecoilState } from 'recoil';
 import { useForm } from 'react-hook-form';
 import { useMediaQuery } from '@librechat/client';
+import type { ReactNode } from 'react';
 import type { ChatFormValues } from '~/common';
 import { ChatContext, ChatFormProvider, ActivePanelProvider } from '~/Providers';
 import useUnifiedSidebarLinks from '~/hooks/Nav/useUnifiedSidebarLinks';
+import OuterscoreHistoryBridge from './OuterscoreHistoryBridge';
 import { useChatHelpers, useLocalize } from '~/hooks';
 import SidePanelNav from '~/components/SidePanel/Nav';
 import ExpandedPanel from './ExpandedPanel';
@@ -41,7 +42,11 @@ function SidebarChatProvider({ children }: { children: ReactNode }) {
 
 function UnifiedSidebar() {
   const localize = useLocalize();
-  const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  // Embedded in Outerscore the sidebar overlays the whole panel at ≤800px (so it's
+  // "either chat or config", never a cramped split); standalone keeps 768px. The
+  // overlay is full-width when embedded (see `isEmbedded` width below).
+  const isEmbedded = typeof window !== 'undefined' && window.parent !== window;
+  const isSmallScreen = useMediaQuery(isEmbedded ? '(max-width: 800px)' : '(max-width: 768px)');
   const [expanded, setExpanded] = useRecoilState(store.sidebarExpanded);
   const [sidebarWidth, setSidebarWidth] = useState(getInitialWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -141,13 +146,16 @@ function UnifiedSidebar() {
             expanded ? 'translate-x-0' : '-translate-x-full',
           )}
           style={{
-            width: 'min(85vw, 380px)',
+            // Embedded: cover the whole panel ("either chat or config", no cramped
+            // split). Standalone: the usual partial mobile drawer + backdrop.
+            width: isEmbedded ? '100vw' : 'min(85vw, 380px)',
             transition: `transform ${TRANSITION_MS}ms ${EASING}`,
           }}
           inert={!expanded ? '' : undefined}
         >
           <SidebarChatProvider>
             <ActivePanelProvider>
+              <OuterscoreHistoryBridge />
               <ExpandedPanel links={links} onCollapse={handleCollapse} />
               <nav className="min-h-0 flex-1 overflow-hidden bg-surface-primary-alt">
                 <SidePanelNav links={links} />
@@ -177,6 +185,7 @@ function UnifiedSidebar() {
   return (
     <SidebarChatProvider>
       <ActivePanelProvider>
+        <OuterscoreHistoryBridge />
         <aside
           className="relative flex h-full flex-shrink-0 overflow-hidden"
           style={{

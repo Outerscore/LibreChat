@@ -107,6 +107,12 @@ try {
         }
         window.dispatchEvent(new CustomEvent('outerscore:language-changed'));
       }
+      if (data.type === 'outerscore:open-history') {
+        // Host header "Chat history" button — re-dispatched for the React-side
+        // bridge, which expands the unified sidebar and selects the
+        // conversations panel (mirrors "open sidebar → chat history").
+        window.dispatchEvent(new CustomEvent('outerscore:open-history'));
+      }
       if (data.type === 'outerscore:logout') {
         clearOuterscoreToken();
         clearCanvasDocIds();

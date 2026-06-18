@@ -39,7 +39,10 @@ function Header() {
     permission: Permissions.USE,
   });
 
-  const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  // Embedded in Outerscore the sidebar overlays the whole panel at ≤800px; standalone
+  // keeps the 768px mobile breakpoint. Kept in sync with UnifiedSidebar / Root.
+  const isEmbedded = typeof window !== 'undefined' && window.parent !== window;
+  const isSmallScreen = useMediaQuery(isEmbedded ? '(max-width: 800px)' : '(max-width: 768px)');
 
   return (
     <div className="os-chat-header via-presentation/70 md:from-presentation/80 md:via-presentation/50 2xl:from-presentation/0 absolute top-0 z-10 flex h-[52px] w-full items-center justify-between bg-gradient-to-b from-presentation to-transparent p-2 font-semibold text-text-primary 2xl:via-transparent">

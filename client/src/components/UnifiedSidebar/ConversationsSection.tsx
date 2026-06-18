@@ -23,7 +23,10 @@ const BookmarkNav = lazy(() => import('~/components/Nav/Bookmarks/BookmarkNav'))
 
 const ConversationsSection = memo(() => {
   const localize = useLocalize();
-  const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  // Embedded in Outerscore the sidebar overlays the whole panel at ≤800px; standalone
+  // keeps the 768px mobile breakpoint. Kept in sync with UnifiedSidebar / Root.
+  const isEmbedded = typeof window !== 'undefined' && window.parent !== window;
+  const isSmallScreen = useMediaQuery(isEmbedded ? '(max-width: 800px)' : '(max-width: 768px)');
   const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
   const { isAuthenticated } = useAuthContext();
   useTitleGeneration(isAuthenticated);

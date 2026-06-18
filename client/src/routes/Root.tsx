@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@librechat/client';
 import {
@@ -27,7 +27,11 @@ export default function Root() {
   const [showTerms, setShowTerms] = useState(false);
   const [bannerHeight, setBannerHeight] = useState(0);
   const sidebarExpanded = useRecoilValue(store.sidebarExpanded);
-  const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  // Embedded in Outerscore the sidebar overlays the whole panel at ≤800px (full-width,
+  // no chat push); standalone keeps the 768px mobile breakpoint + the partial drawer.
+  const isEmbedded = typeof window !== 'undefined' && window.parent !== window;
+  const isSmallScreen = useMediaQuery(isEmbedded ? '(max-width: 800px)' : '(max-width: 768px)');
+  const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
 
   const { isAuthenticated, logout } = useAuthContext();
 
@@ -43,6 +47,14 @@ export default function Root() {
   });
 
   useSearchEnabled(isAuthenticated);
+
+  // Collapse the sidebar on every embedded boot — each AI-assist trigger remounts the
+  // iframe, so the chat (not the sidebar) is what shows when the assistant opens.
+  useEffect(() => {
+    if (isEmbedded) {
+      setSidebarExpanded(false);
+    }
+  }, [isEmbedded, setSidebarExpanded]);
 
   useEffect(() => {
     if (termsData) {
@@ -77,7 +89,9 @@ export default function Root() {
                     className="relative flex h-full max-w-full flex-1 flex-col overflow-hidden"
                     style={{
                       transform:
-                        isSmallScreen && sidebarExpanded ? 'translateX(min(85vw, 380px))' : 'none',
+                        isSmallScreen && sidebarExpanded && !isEmbedded
+                          ? 'translateX(min(85vw, 380px))'
+                          : 'none',
                       transition: 'transform 300ms cubic-bezier(0.2, 0, 0, 1)',
                     }}
                     inert={isSmallScreen && sidebarExpanded ? '' : undefined}

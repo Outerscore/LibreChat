@@ -198,6 +198,16 @@ body {
   box-shadow: 0 1px 2px rgba(15, 6, 48, 0.08);
 }
 
+/* Composer placeholder (embedded only): match the Outerscore app's lighter input
+   placeholder (gray-400) instead of the fork's darker `placeholder-black/60`. Uses
+   the host-mirrored token so it tracks the live palette. The `.os-embedded` + element
+   + pseudo-element specificity beats the single-class Tailwind utility, so no
+   `!important` is needed. Covers the composer and the agent-builder textareas alike. */
+.os-embedded textarea::placeholder {
+  color: var(--os-color-gray-400);
+  opacity: 1;
+}
+
 /* Embedded only: the chat footer is hidden in the iframe, so the composer's
    `sm:mb-10`/`sm:mb-28` bottom margin just leaves dead space at the bottom of
    the host window. Tighten it. Higher specificity beats the Tailwind utility;
