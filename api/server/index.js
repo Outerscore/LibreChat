@@ -36,7 +36,7 @@ const {
   seedDatabase,
 } = require('~/models');
 const initializeOAuthReconnectManager = require('./services/initializeOAuthReconnectManager');
-const { removeSeededComplianceAgents } = require('./services/Outerscore/complianceAgents');
+const { seedComplianceAgents } = require('./services/Outerscore/complianceAgents');
 const { capabilityContextMiddleware } = require('./middleware/roles/capabilities');
 const createValidateImageRequest = require('./middleware/validateImageRequest');
 const { startExpiredFileSweep } = require('./services/Files/process');
@@ -114,11 +114,7 @@ const startServer = async () => {
   }
 
   await runAsSystem(seedDatabase);
-  /* Remove any previously auto-seeded compliance agents (no defaults any more).
-   * Non-blocking + best-effort — must never hold the server back from listening. */
-  runAsSystem(removeSeededComplianceAgents).catch((err) => {
-    logger.error('[outerscore] removeSeededComplianceAgents failed:', err);
-  });
+  await runAsSystem(seedComplianceAgents);
   /* Recover stuck `status: 'pending'` records from a crash mid-render.
    * `runAsSystem` is required — `File` is tenant-isolated and strict
    * mode rejects unscoped queries. Lazy sweep in the preview endpoint
