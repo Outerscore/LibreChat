@@ -20,9 +20,6 @@ permissions:
 
 jobs:
   build:
-    # Upstream-only: the Outerscore fork publishes to GHCR (see deploy-test.yml)
-    # and has no Docker Hub secrets, so skip on forks to avoid login failures.
-    if: github.repository == 'danny-avila/LibreChat'
     runs-on: ubuntu-latest
     timeout-minutes: 130
     strategy:
