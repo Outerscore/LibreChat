@@ -1,0 +1,81 @@
+# Outerscore LibreChat — self-contained STAGING stack.
+#
+# Twin of docker-compose.test.yml, isolated from the test stack so the two can
+# run side-by-side on the SAME Hetzner host without sharing anything:
+#   - explicit project name `librechat-staging` (→ its own volumes/network)
+#   - distinct container names (-staging*)
+#   - distinct host port (127.0.0.1:3081, vs test's 3080)
+# Deployed by .github/workflows/deploy-staging.yml and run from
+# /opt/librechat-staging as:
+#     docker compose -f docker-compose.staging.yml up -d
+#
+# Served under the subpath https://staging.outerscore.com/ai/chat — set
+# DOMAIN_CLIENT/DOMAIN_SERVER to that URL in .env; the host nginx strips the
+# /ai/chat prefix and forwards to 127.0.0.1:3081.
+name: librechat-staging
+
+services:
+  api:
+    image: ${LIBRECHAT_IMAGE}
+    container_name: librechat-staging
+    restart: always
+    ports:
+      # Loopback only — the host reverse proxy is the sole entry point.
+      # NOTE: 3081 (test uses 3080) so both stacks coexist on one host.
+      - "127.0.0.1:3081:3080"
+    depends_on:
+      - mongodb
+      - meilisearch
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - NODE_ENV=production
+      # Internal service addresses (never come from .env). These resolve to
+      # THIS stack's own mongo/meili containers on this project's network.
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - SEARCH=true
+      # Staging-environment safety toggles — enforced regardless of .env.
+      - NO_INDEX=true
+      - TRUST_PROXY=1
+      - ALLOW_REGISTRATION=false
+      - ALLOW_EMAIL_LOGIN=false
+      - ALLOW_SOCIAL_LOGIN=false
+      - OUTERSCORE_SSO_ENABLED=true
+    volumes:
+      - ./.env:/app/.env
+      - ./librechat.staging.yaml:/app/librechat.yaml
+      - ./images:/app/client/public/images
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3080/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  mongodb:
+    image: mongo:8.0.20
+    container_name: librechat-staging-mongo
+    restart: always
+    command: mongod --noauth
+    volumes:
+      - mongo-data:/data/db
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    container_name: librechat-staging-meili
+    restart: always
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+    volumes:
+      - meili-data:/meili_data
+
+volumes:
+  mongo-data:
+  meili-data:
