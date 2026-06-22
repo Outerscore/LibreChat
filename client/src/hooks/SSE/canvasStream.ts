@@ -184,8 +184,39 @@ export const createCanvasStreamBridge = ({
     postToCanvas({ type: 'outerscore:stream-chunk', chunk, accumulated: body });
   };
 
+  // Route a compliance-only reply (the selected compliance agent) to the findings
+  // panel: post the parsed findings to the host and replace the raw <compliance>
+  // JSON in the chat bubble. Returns true when it handled the reply, so finalize
+  // can stop before the document / chat-mode paths touch it. A compliance envelope
+  // is ALWAYS an audit — never document content and never a chat answer — so this
+  // runs regardless of routing mode (always/chat included).
+  const routeComplianceReply = (): boolean => {
+    const msgs = getMessages() ?? [];
+    const last = msgs[msgs.length - 1];
+    const replyText = last && !last.isCreatedByUser ? extractMessageText(last) : '';
+    if (!isComplianceOnlyReply(replyText)) {
+      return false;
+    }
+    const { findings } = parseComplianceEnvelope(replyText);
+    if (isInIframe && isOnCanvasPage()) {
+      postToParent({ type: 'outerscore:compliance-result', findings });
+      const stripped = stripCanvasEnvelopes(replyText);
+      replaceLastAssistantText(
+        stripped || (findings.length > 0 ? COMPLIANCE_SUMMARY_TEXT : NO_COMPLIANCE_FINDINGS_TEXT),
+      );
+    } else {
+      replaceLastAssistantText(formatComplianceReply(replyText));
+    }
+    return true;
+  };
+
   const finalize = () => {
     forwardCanvasStream();
+    // Audit replies are handled first and unconditionally: neither the always-mode
+    // document path nor chat-mode envelope stripping may swallow the findings.
+    if (routeComplianceReply()) {
+      return;
+    }
     sanitizeChatModeReply();
     if (canvasCapable) {
       if (alwaysDocument) {
@@ -199,36 +230,13 @@ export const createCanvasStreamBridge = ({
         // TODO(compliance): regular-mode compliance is disabled — a document write
         // no longer forwards findings (they referenced the pre-edit content and
         // mismatched the editor highlights). Compliance is produced only by the
-        // explicitly-selected compliance agent (handled by the audit path below).
+        // explicitly-selected compliance agent (handled by routeComplianceReply above).
         const body = extractDocBody(rawText);
         // Never clobber the editor with an empty body (weak/aborted replies).
         if (body.length > 0) {
           postToCanvas({ type: 'outerscore:stream-end', accumulated: body });
           replaceLastAssistantWithPlaceholder();
           postToCanvas({ type: 'outerscore:canvas-complete' });
-        }
-      }
-    }
-    // Audit reply (a <compliance> envelope, no <document>): the raw JSON must
-    // never remain in the chat bubble. On a canvas page the findings drive the
-    // host panel + editor highlights, so the bubble just points there; in a
-    // regular chat (no panel) they are rendered readably in the bubble. Skipped
-    // in always-mode (the whole reply is the document, handled above).
-    if (!alwaysDocument) {
-      const msgs = getMessages() ?? [];
-      const last = msgs[msgs.length - 1];
-      const replyText = last && !last.isCreatedByUser ? extractMessageText(last) : '';
-      if (isComplianceOnlyReply(replyText)) {
-        const { findings } = parseComplianceEnvelope(replyText);
-        if (isInIframe && isOnCanvasPage()) {
-          postToParent({ type: 'outerscore:compliance-result', findings });
-          const stripped = stripCanvasEnvelopes(replyText);
-          replaceLastAssistantText(
-            stripped ||
-              (findings.length > 0 ? COMPLIANCE_SUMMARY_TEXT : NO_COMPLIANCE_FINDINGS_TEXT),
-          );
-        } else {
-          replaceLastAssistantText(formatComplianceReply(replyText));
         }
       }
     }
