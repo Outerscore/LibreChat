@@ -250,6 +250,13 @@ describe('canvas — user mode & routing', () => {
       expect(prompt).not.toContain('<document>');
       expect(prompt).not.toContain('compliance envelope');
     });
+
+    it('builds a job-description canvas prompt with its own artifact + structure', () => {
+      sessionStorage.setItem(PAGE_KEY, 'job-description');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('Job Description');
+      expect(prompt).toContain('## Responsibilities');
+    });
   });
 });
 

@@ -23,7 +23,7 @@ export interface ComplianceSpec {
 }
 
 /** `os_page` values that map to a seeded compliance agent. */
-export type CompliancePage = 'sow-project-brief' | 'sow-deliverable-description';
+export type CompliancePage = 'sow-project-brief' | 'sow-deliverable-description' | 'job-description';
 
 /** Default model for seeded agents; override per deployment with `OUTERSCORE_COMPLIANCE_MODEL`. */
 export const DEFAULT_COMPLIANCE_MODEL = 'claude-sonnet-4-6';
@@ -74,6 +74,20 @@ const DELIVERABLE_INSTRUCTIONS = [
   ENVELOPE_PROTOCOL,
 ].join('\n');
 
+const JOB_DESCRIPTION_INSTRUCTIONS = [
+  'You are a procurement compliance reviewer for job descriptions (TEMP_WORK and contractor roles) on the Outerscore platform. You will be given the current text of a job description. Your only job is to audit it against the rules below and report findings. You never rewrite the document, never add commentary, and never answer questions.',
+  '',
+  'Check the text against these rules:',
+  '- Discriminatory or biased wording (gender, age, nationality, marital/family status, disability, or other protected characteristics) — flag HIGH.',
+  '- Vendor-locked or branded language where a neutral, skills-based alternative exists — flag MODERATE.',
+  '- GDPR / data-handling obligations missing when personal data is clearly in scope — flag HIGH.',
+  '- Vague, unmeasurable, or non–job-related requirements (e.g. arbitrary years-of-experience that exclude candidates without justification) — flag MODERATE (LOW when merely imprecise).',
+  '',
+  FINDING_RULES,
+  '',
+  ENVELOPE_PROTOCOL,
+].join('\n');
+
 /**
  * `os_page` → seed spec. The `id` is deterministic so the route resolves the
  * agent without any stored mapping; it doubles as the create-if-absent key.
@@ -90,5 +104,12 @@ export const COMPLIANCE_SPECS: Record<CompliancePage, ComplianceSpec> = {
     name: 'Outerscore Compliance — Deliverable Description',
     description: 'Auto-seeded: audits SOW deliverable descriptions against compliance rules.',
     instructions: DELIVERABLE_INSTRUCTIONS,
+  },
+  'job-description': {
+    id: 'agent_oscompliance__job-description',
+    name: 'Outerscore Compliance — Job Description',
+    description:
+      'Auto-seeded: audits TEMP_WORK / contractor job descriptions against procurement/compliance rules.',
+    instructions: JOB_DESCRIPTION_INSTRUCTIONS,
   },
 };
