@@ -4,7 +4,12 @@ import type { TMessage, TMessageContentParts } from 'librechat-data-provider';
 const CANVAS_CONTEXT_KEY = 'outerscore:canvas-content';
 const CANVAS_PAGE_KEY = 'outerscore:page';
 const CANVAS_MODE_KEY = 'outerscore:canvas-mode';
-const CANVAS_PAGES = new Set(['canvas2', 'sow-project-brief', 'sow-deliverable-description']);
+const CANVAS_PAGES = new Set([
+  'canvas2',
+  'sow-project-brief',
+  'sow-deliverable-description',
+  'job-description',
+]);
 
 /**
  * User-selected canvas mode (the composer toggle on canvas pages):
@@ -189,6 +194,18 @@ const DELIVERABLE_DESC_SPEC: CanvasSpec = {
   ],
 };
 
+const JOB_DESCRIPTION_SPEC: CanvasSpec = {
+  artifact: 'Job Description',
+  structure:
+    'Use these top-level sections in order: ## Role, ## Responsibilities, ## Requirements, ## Nice-to-haves. Keep it concise and scannable — under ~350 words.',
+  rules: [
+    'discriminatory or biased wording (gender, age, nationality, or other protected characteristics)',
+    'vendor-locked or branded language where a neutral, skills-based alternative exists',
+    'GDPR / data-handling obligations missing when personal data is in scope',
+    'vague, unmeasurable, or non–job-related requirements',
+  ],
+};
+
 const GENERIC_SPEC: CanvasSpec = {
   artifact: 'document',
   structure: 'Keep the structure that best fits the document.',
@@ -198,6 +215,7 @@ const GENERIC_SPEC: CanvasSpec = {
 const SPEC_BY_PAGE: Record<string, CanvasSpec> = {
   'sow-project-brief': PROJECT_BRIEF_SPEC,
   'sow-deliverable-description': DELIVERABLE_DESC_SPEC,
+  'job-description': JOB_DESCRIPTION_SPEC,
 };
 
 /**

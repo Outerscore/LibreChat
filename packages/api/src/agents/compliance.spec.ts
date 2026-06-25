@@ -5,6 +5,7 @@ describe('compliance specs', () => {
 
   it('exposes a spec per supported canvas page with deterministic, unique ids', () => {
     expect(Object.keys(COMPLIANCE_SPECS).sort()).toEqual([
+      'job-description',
       'sow-deliverable-description',
       'sow-project-brief',
     ]);
@@ -31,13 +32,17 @@ describe('compliance specs', () => {
     });
   });
 
-  it('keeps the two page prompts distinct (brief vs deliverable structure)', () => {
+  it('keeps the page prompts distinct (brief vs deliverable vs job description)', () => {
     expect(COMPLIANCE_SPECS['sow-project-brief'].instructions).not.toEqual(
       COMPLIANCE_SPECS['sow-deliverable-description'].instructions,
     );
     expect(COMPLIANCE_SPECS['sow-project-brief'].instructions).toContain('Project Brief');
     expect(COMPLIANCE_SPECS['sow-deliverable-description'].instructions).toContain(
       'deliverable description',
+    );
+    expect(COMPLIANCE_SPECS['job-description'].instructions).toContain('job description');
+    expect(COMPLIANCE_SPECS['job-description'].instructions).not.toEqual(
+      COMPLIANCE_SPECS['sow-project-brief'].instructions,
     );
   });
 
