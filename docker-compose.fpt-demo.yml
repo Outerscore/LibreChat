@@ -1,0 +1,77 @@
+# Outerscore LibreChat — self-contained FPT-demo STACK (customer demo).
+#
+# Twin of docker-compose.staging.yml, isolated so test / staging / fpt-demo run
+# side-by-side on the SAME Hetzner box without sharing anything:
+#   - explicit project name `librechat-fpt-demo` (→ its own volumes/network)
+#   - distinct container names (-fpt-demo*)
+#   - distinct host port (127.0.0.1:3082 — test 3080, staging 3081)
+# Deployed by .github/workflows/deploy-fpt-demo.yml, run from /opt/librechat-fpt-demo as:
+#     docker compose -f docker-compose.fpt-demo.yml up -d
+#
+# Served under https://fpt-demo.outerscore.com/ai/chat (host nginx strips the
+# /ai/chat prefix and forwards to 127.0.0.1:3082).
+name: librechat-fpt-demo
+
+services:
+  api:
+    image: ${LIBRECHAT_IMAGE}
+    container_name: librechat-fpt-demo
+    restart: always
+    ports:
+      # Loopback only — host reverse proxy is the sole entry point. 3082 = FPT-demo.
+      - "127.0.0.1:3082:3080"
+    depends_on:
+      - mongodb
+      - meilisearch
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - NODE_ENV=production
+      # Internal service addresses — resolve to THIS stack's own mongo/meili.
+      - MONGO_URI=mongodb://mongodb:27017/LibreChat
+      - MEILI_HOST=http://meilisearch:7700
+      - SEARCH=true
+      # Demo-environment safety toggles — enforced regardless of .env.
+      - NO_INDEX=true
+      - TRUST_PROXY=1
+      - ALLOW_REGISTRATION=false
+      - ALLOW_EMAIL_LOGIN=false
+      - ALLOW_SOCIAL_LOGIN=false
+      - OUTERSCORE_SSO_ENABLED=true
+    volumes:
+      - ./.env:/app/.env
+      - ./librechat.fpt-demo.yaml:/app/librechat.yaml
+      - ./images:/app/client/public/images
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3080/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  mongodb:
+    image: mongo:8.0.20
+    container_name: librechat-fpt-demo-mongo
+    restart: always
+    command: mongod --noauth
+    volumes:
+      - mongo-data:/data/db
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.35.1
+    container_name: librechat-fpt-demo-meili
+    restart: always
+    environment:
+      - MEILI_HOST=http://meilisearch:7700
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+    volumes:
+      - meili-data:/meili_data
+
+volumes:
+  mongo-data:
+  meili-data:

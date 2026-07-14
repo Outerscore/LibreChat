@@ -1,0 +1,25 @@
+# Outerscore FPT-demo LibreChat config (tracked — the local `librechat.yaml` is gitignored).
+# Shipped by .github/workflows/deploy-fpt-demo.yml, bind-mounted at /app/librechat.yaml
+# (see docker-compose.fpt-demo.yml). Mirrors the test/staging config.
+version: 1.3.8
+cache: true
+
+interface:
+  privacyPolicy:
+    externalUrl: ''
+  termsOfService:
+    modalAcceptance: false
+  modelSelect: true
+  agents:
+    use: true
+    create: true
+
+endpoints:
+  anthropic:
+    titleConvo: true
+    titleModel: "claude-haiku-4-5-20251001"
+    streamRate: 25
+    models:
+      - "claude-opus-4-8"
+      - "claude-sonnet-4-6"
+      - "claude-haiku-4-5-20251001"

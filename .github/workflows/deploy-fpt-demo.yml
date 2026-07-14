@@ -1,0 +1,119 @@
+name: Deploy LibreChat to FPT-demo
+
+# Deploys the Outerscore LibreChat fork to the FPT customer demo environment
+# (fpt-demo.outerscore.com — the Hetzner box, same host as test/staging).
+#
+# Twin of deploy-staging.yml. Differences: builds with the FPT-demo parent origin,
+# pushes a `librechat-fpt-demo` image, deploys to /opt/librechat-fpt-demo, reads the
+# `fpt-demo` GitHub Environment's secrets, and runs the FPT-demo compose file.
+#
+# Manual only (workflow_dispatch) — customer demo environments are deployed on
+# demand, mirroring the frontend `customer.yaml`. Default builds `dev` (the
+# fork's code lives on dev; the FPT-demo env differs only by parent origin +
+# runtime env + port).
+#
+# IMPORTANT: the `fpt-demo` GitHub Environment must NOT have "required reviewers".
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch or ref to build and deploy"
+        required: true
+        default: "dev"
+
+concurrency:
+  group: librechat-fpt-demo-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  PARENT_ORIGIN: https://fpt-demo.outerscore.com
+  DEPLOY_REF: ${{ github.event.inputs.branch || 'dev' }}
+
+jobs:
+  build:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    environment: fpt-demo
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+    steps:
+      - name: Checkout ${{ env.DEPLOY_REF }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build
+        run: |
+          set -euo pipefail
+          OWNER_LC="$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          SAFE_BRANCH="$(printf '%s' "${DEPLOY_REF}" | tr '/' '-' | tr -cd '[:alnum:]._-')"
+          IMAGE="${REGISTRY}/${OWNER_LC}/librechat-fpt-demo:${SAFE_BRANCH}-${GITHUB_SHA::8}"
+          LATEST="${REGISTRY}/${OWNER_LC}/librechat-fpt-demo:fpt-demo-latest"
+          echo "Building ${IMAGE}"
+          docker build \
+            --build-arg VITE_OUTERSCORE_PARENT_ORIGIN="${PARENT_ORIGIN}" \
+            -t "${IMAGE}" -t "${LATEST}" .
+          docker push "${IMAGE}"
+          docker push "${LATEST}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy to FPT-demo host
+    needs: build
+    runs-on: ubuntu-latest
+    environment: fpt-demo
+    steps:
+      - name: Checkout ${{ env.DEPLOY_REF }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_REF }}
+
+      - name: Copy compose + config to host
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.fpt-demo.yml,librechat.fpt-demo.yaml"
+          target: "/opt/librechat-fpt-demo"
+          overwrite: true
+
+      - name: Write .env, pull image, restart stack
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENV_FILE: ${{ secrets.LIBRECHAT_FPT_DEMO_ENV }}
+          IMAGE: ${{ needs.build.outputs.image }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          envs: ENV_FILE,IMAGE,GHCR_USER,GHCR_TOKEN
+          script: |
+            set -euo pipefail
+            cd /opt/librechat-fpt-demo
+            umask 077
+            printf '%s\n' "$ENV_FILE" > .env
+            sed -i '/^LIBRECHAT_IMAGE=/d' .env
+            echo "LIBRECHAT_IMAGE=$IMAGE" >> .env
+            chmod 600 .env
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            docker pull "$IMAGE"
+            docker compose -f docker-compose.fpt-demo.yml up -d
+            docker logout ghcr.io || true
+            docker image prune -f
