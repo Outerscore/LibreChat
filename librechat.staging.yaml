@@ -18,6 +18,8 @@ interface:
   agents:
     use: true
     create: true
+  marketplace:
+    use: true
 
 # Claude only. The Anthropic endpoint is enabled by ANTHROPIC_API_KEY (set in .env);
 # this block restricts the selectable models and uses a cheap model for titles.
