@@ -257,6 +257,13 @@ describe('canvas — user mode & routing', () => {
       expect(prompt).toContain('Job Description');
       expect(prompt).toContain('## Responsibilities');
     });
+
+    it('builds a contract-description prompt restricted to PDF-safe blocks', () => {
+      sessionStorage.setItem(PAGE_KEY, 'contract-description');
+      const prompt = buildCanvasSystemPrompt();
+      expect(prompt).toContain('contract work description');
+      expect(prompt).toContain('Never use tables, code fences');
+    });
   });
 });
 

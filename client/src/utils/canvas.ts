@@ -9,6 +9,7 @@ const CANVAS_PAGES = new Set([
   'sow-project-brief',
   'sow-deliverable-description',
   'job-description',
+  'contract-description',
 ]);
 
 /**
@@ -206,6 +207,18 @@ const JOB_DESCRIPTION_SPEC: CanvasSpec = {
   ],
 };
 
+const CONTRACT_DESCRIPTION_SPEC: CanvasSpec = {
+  artifact: 'contract work description',
+  structure:
+    'Structure the document with short "##" headings, paragraphs, and bullet or numbered lists ONLY. Never use tables, code fences, images, checkboxes, blockquotes, or horizontal rules — they are stripped from the final contract PDF. Heading levels are irrelevant (all render identically), so use "##" throughout. Use precise, neutral contract language and keep it under ~500 words.',
+  rules: [
+    'discriminatory or biased wording',
+    'unresolved placeholders ("TBD", "[insert ...]")',
+    'ambiguous obligations without measurable criteria',
+    'commercial terms (payment, liability, jurisdiction) that belong to the contract frame, not the work description',
+  ],
+};
+
 const GENERIC_SPEC: CanvasSpec = {
   artifact: 'document',
   structure: 'Keep the structure that best fits the document.',
@@ -216,6 +229,7 @@ const SPEC_BY_PAGE: Record<string, CanvasSpec> = {
   'sow-project-brief': PROJECT_BRIEF_SPEC,
   'sow-deliverable-description': DELIVERABLE_DESC_SPEC,
   'job-description': JOB_DESCRIPTION_SPEC,
+  'contract-description': CONTRACT_DESCRIPTION_SPEC,
 };
 
 /**
